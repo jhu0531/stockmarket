@@ -1,0 +1,14 @@
+{
+  "name": "stockmarket",
+  "version": "1.0.0",
+  "description": "KOSPI/KOSDAQ index dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "express": "^4.19.2",
+    "iconv-lite": "^0.7.3"
+  }
+}

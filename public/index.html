@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>국내 증시 현황 | KOSPI · KOSDAQ</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1>국내 증시 현황</h1>
+      <p class="subtitle">코스피 · 코스닥 실시간 지수</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="news-section" id="ny-news-section">
+      <div class="section-header">
+        <h2 class="section-title">해외뉴스</h2>
+        <button id="news-section-toggle" class="section-toggle" type="button" aria-expanded="false" aria-controls="ny-news-list">
+          펼치기
+        </button>
+      </div>
+      <ul class="news-list" id="ny-news-list" hidden>
+        <li class="news-item news-loading">불러오는 중...</li>
+      </ul>
+    </section>
+
+    <section class="news-section" id="kr-news-section">
+      <div class="section-header">
+        <h2 class="section-title">국내뉴스</h2>
+        <button id="kr-news-section-toggle" class="section-toggle" type="button" aria-expanded="false" aria-controls="kr-news-list">
+          펼치기
+        </button>
+      </div>
+      <ul class="news-list" id="kr-news-list" hidden>
+        <li class="news-item news-loading">불러오는 중...</li>
+      </ul>
+    </section>
+
+    <div class="status-bar">
+      <span id="updated-at">불러오는 중...</span>
+      <button id="refresh-btn" type="button">새로고침</button>
+    </div>
+
+    <section class="index-grid" id="index-grid">
+      <article class="index-card" data-code="KOSPI">
+        <h2 class="index-name">코스피 <span class="index-code">KOSPI</span></h2>
+        <p class="index-price">-</p>
+        <p class="index-change">
+          <span class="change-value">-</span>
+          <span class="change-ratio">-</span>
+        </p>
+        <p class="market-status">-</p>
+      </article>
+
+      <article class="index-card" data-code="KOSDAQ">
+        <h2 class="index-name">코스닥 <span class="index-code">KOSDAQ</span></h2>
+        <p class="index-price">-</p>
+        <p class="index-change">
+          <span class="change-value">-</span>
+          <span class="change-ratio">-</span>
+        </p>
+        <p class="market-status">-</p>
+      </article>
+    </section>
+
+    <p id="error-msg" class="error-msg" hidden></p>
+
+    <section class="leading-section" id="leading-section">
+      <h2 class="section-title">선행지수</h2>
+
+      <h3 class="subsection-title">미국 증시</h3>
+      <div class="leading-grid" id="us-index-grid">
+        <article class="mini-card" data-code=".DJI">
+          <p class="mini-name">다우지수</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+        </article>
+        <article class="mini-card" data-code=".INX">
+          <p class="mini-name">S&amp;P지수</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+        </article>
+        <article class="mini-card" data-code=".IXIC">
+          <p class="mini-name">나스닥지수</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+        </article>
+        <article class="mini-card" data-code=".SOX">
+          <p class="mini-name">필라델피아 반도체</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+        </article>
+      </div>
+      <div class="leading-grid" id="us-stock-grid">
+        <article class="mini-card" data-code="NVDA.O">
+          <p class="mini-name">엔비디아</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+        </article>
+        <article class="mini-card" data-code="GOOGL.O">
+          <p class="mini-name">구글</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+        </article>
+        <article class="mini-card" data-code="MSFT.O">
+          <p class="mini-name">마이크로소프트</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+        </article>
+        <article class="mini-card" data-code="AAPL.O">
+          <p class="mini-name">애플</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+        </article>
+        <article class="mini-card" data-code="AMZN.O">
+          <p class="mini-name">아마존</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+        </article>
+        <article class="mini-card" data-code="TSLA.O">
+          <p class="mini-name">테슬라</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+        </article>
+      </div>
+
+      <h3 class="subsection-title">원/달러 환율</h3>
+      <div class="leading-grid">
+        <article class="mini-card" id="usd-krw-card">
+          <p class="mini-name">USD/KRW</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+      </div>
+
+      <h3 class="subsection-title">미국 국채 10년물 금리 · 장단기 금리차</h3>
+      <div class="leading-grid">
+        <article class="mini-card" id="us-yield10y-card">
+          <p class="mini-name">美 국채 10년물 금리</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" id="us-spread-card">
+          <p class="mini-name">장단기 금리차 (10Y-2Y)</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+      </div>
+
+      <h3 class="subsection-title">OECD 경기선행지수</h3>
+      <div class="leading-grid">
+        <article class="mini-card" id="oecd-cli-card">
+          <p class="mini-name">한국 (OECD CLI)</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" id="china-bci-card">
+          <p class="mini-name">중국 (OECD 기업경기신뢰지수)</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+      </div>
+
+      <h3 class="subsection-title">증시 주변자금</h3>
+      <div class="leading-grid">
+        <article class="mini-card" id="deposits-card">
+          <p class="mini-name">고객예탁금 (억원)</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" id="margin-card">
+          <p class="mini-name">신용공여 잔고 (억원)</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+      </div>
+
+      <h3 class="subsection-title">원자재지수 (Trading Economics)</h3>
+      <div class="leading-grid" id="commodity-grid">
+        <article class="mini-card" data-code="CRUDE">
+          <p class="mini-name">원유 (WTI)</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="BRENT">
+          <p class="mini-name">브렌트유</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="NATGAS">
+          <p class="mini-name">천연가스</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="GASOLINE">
+          <p class="mini-name">가솔린</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="COAL">
+          <p class="mini-name">석탄</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="NAPHTHA">
+          <p class="mini-name">나프타</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="PROPANE">
+          <p class="mini-name">프로판</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="URANIUM">
+          <p class="mini-name">우라늄</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="GOLD">
+          <p class="mini-name">금</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="SILVER">
+          <p class="mini-name">은</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="COPPER">
+          <p class="mini-name">구리</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="STEEL">
+          <p class="mini-name">강철</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="LITHIUM">
+          <p class="mini-name">리튬</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="IRONORE">
+          <p class="mini-name">철광석</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="PLATINUM">
+          <p class="mini-name">백금</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+        <article class="mini-card" data-code="ALUMINUM">
+          <p class="mini-name">알루미늄</p>
+          <p class="mini-price">-</p>
+          <p class="mini-change"><span class="change-value">-</span> <span class="change-ratio">-</span></p>
+          <p class="mini-meta">-</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>데이터 제공: 네이버 금융 · 자동 갱신 30초</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

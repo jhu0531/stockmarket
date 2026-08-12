@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: stockmarket
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
