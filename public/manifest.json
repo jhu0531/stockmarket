@@ -1,0 +1,23 @@
+{
+  "name": "주린이 기우제",
+  "short_name": "주린이 기우제",
+  "description": "코스피 · 코스닥 실시간 지수와 선행지수 대시보드",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#14161a",
+  "theme_color": "#14161a",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
