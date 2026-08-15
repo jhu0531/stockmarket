@@ -329,6 +329,111 @@ main {
   font-size: 0.9rem;
 }
 
+.sentiment-section {
+  margin: 1.5rem 0 2.5rem;
+}
+
+.sentiment-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+}
+
+.sentiment-label {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.sentiment-card.up .sentiment-label {
+  color: var(--up);
+}
+
+.sentiment-card.down .sentiment-label {
+  color: var(--down);
+}
+
+.sentiment-card.flat .sentiment-label {
+  color: var(--flat);
+}
+
+.sentiment-bar {
+  margin-top: 0.75rem;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.sentiment-bar-fill {
+  height: 100%;
+  width: 0;
+}
+
+.sentiment-summary {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.sentiment-disclaimer {
+  margin: 0.6rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.sentiment-detail-list {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.sentiment-detail-list[hidden] {
+  display: none;
+}
+
+.sentiment-detail-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.85rem;
+}
+
+.sentiment-detail-item .signal-direction {
+  color: var(--muted);
+  flex: 1;
+  text-align: right;
+}
+
+.sentiment-detail-item .signal-impact {
+  flex-shrink: 0;
+  font-weight: 600;
+  min-width: 3.2rem;
+  text-align: right;
+}
+
+.sentiment-detail-item .signal-impact.up {
+  color: var(--up);
+}
+
+.sentiment-detail-item .signal-impact.down {
+  color: var(--down);
+}
+
+.sentiment-detail-item .signal-impact.flat {
+  color: var(--flat);
+}
+
 .leading-section {
   margin: 2.5rem 0 1.5rem;
 }

@@ -122,7 +122,7 @@ app.get('/api/leading-indicators', async (req, res) => {
     usKrSpread = { value, direction: directionOf(value) };
   }
 
-  res.json({
+  const payload = {
     us: values.us || [],
     usStocks: values.usStocks || [],
     vix: (values.vix && values.vix[0]) || null,
@@ -146,7 +146,11 @@ app.get('/api/leading-indicators', async (req, res) => {
     fundFlow: values.fundFlow,
     commodities: values.commodities || [],
     updatedAt: new Date().toISOString(),
-  });
+  };
+
+  payload.signalScore = computeSignalScore(payload);
+
+  res.json(payload);
 });
 
 function directionOf(change) {
@@ -154,6 +158,77 @@ function directionOf(change) {
   if (change > 0) return 'RISING';
   if (change < 0) return 'FALLING';
   return 'EVEN';
+}
+
+function averageDirection(directions) {
+  let up = 0;
+  let down = 0;
+  directions.forEach((d) => {
+    if (d === 'RISING') up += 1;
+    else if (d === 'FALLING') down += 1;
+  });
+  if (up > down) return 'RISING';
+  if (down > up) return 'FALLING';
+  return 'EVEN';
+}
+
+// A lightweight, transparent "how many leading indicators point which way"
+// gauge — NOT a prediction model. Each signal contributes +1 (bullish), -1
+// (bearish), or 0 (flat/unavailable) toward KOSPI; "invert" is used where a
+// falling value is conventionally the bullish read (e.g. VIX, credit spread).
+function computeSignalScore(payload) {
+  const signals = [];
+
+  const addSignal = (label, direction, { invert = false } = {}) => {
+    if (!direction) return;
+    let impact = direction === 'RISING' ? 1 : direction === 'FALLING' ? -1 : 0;
+    if (invert) impact *= -1;
+    signals.push({ label, direction, impact });
+  };
+
+  if (payload.us.length) addSignal('미국 증시', averageDirection(payload.us.map((d) => d.direction)));
+  if (payload.usStocks.length)
+    addSignal('미국 빅테크', averageDirection(payload.usStocks.map((d) => d.direction)));
+  if (payload.vix) addSignal('VIX (공포지수)', payload.vix.direction, { invert: true });
+  if (payload.usdKrw) addSignal('원/달러 환율', payload.usdKrw.direction, { invert: true });
+  if (payload.usTreasury.yield10y)
+    addSignal('美 국채 10년물 금리', payload.usTreasury.yield10y.direction, { invert: true });
+  if (payload.usTreasury.spread10y2y)
+    addSignal('美 장단기 금리차', payload.usTreasury.spread10y2y.direction);
+  if (payload.rates.creditSpread) addSignal('신용스프레드', payload.rates.creditSpread.direction, { invert: true });
+  if (payload.rates.usFedRate) addSignal('미국 기준금리', payload.rates.usFedRate.upper.direction, { invert: true });
+  if (payload.rates.krBaseRate) addSignal('한국 기준금리', payload.rates.krBaseRate.direction, { invert: true });
+  if (payload.sentiment.bsi) addSignal('BSI 업황전망', payload.sentiment.bsi.direction);
+  if (payload.sentiment.ccsi) addSignal('CCSI 소비자심리', payload.sentiment.ccsi.direction);
+  if (payload.investorFlow.kospi) {
+    addSignal('코스피 외국인 순매수', payload.investorFlow.kospi.foreign.direction);
+    addSignal('코스피 기관 순매수', payload.investorFlow.kospi.institution.direction);
+  }
+  if (payload.investorFlow.kosdaq) {
+    addSignal('코스닥 외국인 순매수', payload.investorFlow.kosdaq.foreign.direction);
+    addSignal('코스닥 기관 순매수', payload.investorFlow.kosdaq.institution.direction);
+  }
+  if (payload.bdi) addSignal('BDI (발틱운임지수)', payload.bdi.direction);
+  if (payload.fundFlow && payload.fundFlow.deposits) addSignal('고객예탁금', payload.fundFlow.deposits.direction);
+
+  const score = signals.reduce((sum, s) => sum + s.impact, 0);
+  const bullishCount = signals.filter((s) => s.impact > 0).length;
+  const bearishCount = signals.filter((s) => s.impact < 0).length;
+  const neutralCount = signals.length - bullishCount - bearishCount;
+
+  let label = 'NEUTRAL';
+  if (score >= 5) label = 'FAVORABLE';
+  else if (score <= -5) label = 'UNFAVORABLE';
+
+  return {
+    score,
+    maxScore: signals.length,
+    label,
+    bullishCount,
+    bearishCount,
+    neutralCount,
+    signals,
+  };
 }
 
 // FRED's fredgraph.csv export needs no API key. Returns the latest observation

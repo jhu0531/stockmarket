@@ -231,6 +231,85 @@ function renderUsKrSpreadCard(card, spread) {
   card.querySelector('.change-value').textContent = spread.value > 0 ? '미국 > 한국' : spread.value < 0 ? '한국 > 미국' : '동일';
 }
 
+const SIGNAL_LABEL = {
+  FAVORABLE: '우호적',
+  NEUTRAL: '중립',
+  UNFAVORABLE: '비우호적',
+};
+
+const SIGNAL_CLASS = {
+  FAVORABLE: 'up',
+  NEUTRAL: 'flat',
+  UNFAVORABLE: 'down',
+};
+
+const sentimentCard = document.getElementById('sentiment-card');
+const sentimentLabelEl = document.getElementById('sentiment-label');
+const sentimentBarFillEl = document.getElementById('sentiment-bar-fill');
+const sentimentSummaryEl = document.getElementById('sentiment-summary');
+const sentimentDetailListEl = document.getElementById('sentiment-detail-list');
+const sentimentToggleEl = document.getElementById('sentiment-toggle');
+
+sentimentToggleEl.addEventListener('click', () => {
+  const isOpen = sentimentToggleEl.getAttribute('aria-expanded') === 'true';
+  sentimentToggleEl.setAttribute('aria-expanded', String(!isOpen));
+  sentimentToggleEl.textContent = isOpen ? '펼치기' : '접기';
+  sentimentDetailListEl.hidden = isOpen;
+});
+
+// Renders the "how many leading indicators point which way" gauge. This is a
+// transparent signal count, not a prediction — every underlying signal is
+// listed so the number can be inspected rather than trusted blindly.
+function renderSignalScore(signalScore) {
+  sentimentCard.classList.remove('up', 'down', 'flat');
+
+  if (!signalScore || !signalScore.maxScore) {
+    sentimentCard.classList.add('flat');
+    sentimentLabelEl.textContent = '데이터 없음';
+    sentimentSummaryEl.textContent = '-';
+    sentimentBarFillEl.style.width = '0';
+    sentimentDetailListEl.innerHTML = '';
+    return;
+  }
+
+  sentimentCard.classList.add(SIGNAL_CLASS[signalScore.label] || 'flat');
+  sentimentLabelEl.textContent = `${SIGNAL_LABEL[signalScore.label] || '중립'} (${signalScore.score > 0 ? '+' : ''}${signalScore.score})`;
+  sentimentSummaryEl.textContent =
+    `우호적 ${signalScore.bullishCount} · 중립 ${signalScore.neutralCount} · 비우호적 ${signalScore.bearishCount} ` +
+    `(총 ${signalScore.maxScore}개 지표)`;
+
+  const total = signalScore.maxScore;
+  const bullishPct = (signalScore.bullishCount / total) * 100;
+  const neutralPct = (signalScore.neutralCount / total) * 100;
+  sentimentBarFillEl.style.width = '100%';
+  sentimentBarFillEl.style.background =
+    `linear-gradient(to right, var(--up) ${bullishPct}%, var(--flat) ${bullishPct}% ${bullishPct + neutralPct}%, var(--down) ${bullishPct + neutralPct}% 100%)`;
+
+  sentimentDetailListEl.innerHTML = '';
+  signalScore.signals.forEach((signal) => {
+    const li = document.createElement('li');
+    li.className = 'sentiment-detail-item';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = signal.label;
+
+    const dirSpan = document.createElement('span');
+    dirSpan.className = 'signal-direction';
+    dirSpan.textContent =
+      signal.direction === 'RISING' ? '▲ 상승' : signal.direction === 'FALLING' ? '▼ 하락' : '- 보합';
+
+    const impactSpan = document.createElement('span');
+    const impactClass = signal.impact > 0 ? 'up' : signal.impact < 0 ? 'down' : 'flat';
+    impactSpan.className = `signal-impact ${impactClass}`;
+    impactSpan.textContent = signal.impact > 0 ? '우호적' : signal.impact < 0 ? '비우호적' : '중립';
+
+    li.appendChild(nameSpan);
+    li.appendChild(dirSpan);
+    li.appendChild(impactSpan);
+    sentimentDetailListEl.appendChild(li);
+  });
+}
+
 async function loadLeadingIndicators() {
   ALL_LEADING_CARDS.forEach((card) => card.classList.add('loading'));
 
@@ -328,10 +407,13 @@ async function loadLeadingIndicators() {
         tradedAt: data.bdi.date,
       });
     }
+
+    renderSignalScore(data.signalScore);
   } catch (err) {
     ALL_LEADING_CARDS.forEach((card) => {
       card.querySelector('.mini-price').textContent = '오류';
     });
+    renderSignalScore(null);
   } finally {
     ALL_LEADING_CARDS.forEach((card) => card.classList.remove('loading'));
   }

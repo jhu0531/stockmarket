@@ -74,6 +74,32 @@
 
     <p id="error-msg" class="error-msg" hidden></p>
 
+    <section class="sentiment-section" id="sentiment-section">
+      <div class="section-header">
+        <h2 class="section-title">선행지수 심리 게이지</h2>
+        <button
+          id="sentiment-toggle"
+          class="section-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="sentiment-detail-list"
+        >
+          펼치기
+        </button>
+      </div>
+      <article class="sentiment-card" id="sentiment-card">
+        <p class="sentiment-label" id="sentiment-label">불러오는 중...</p>
+        <div class="sentiment-bar">
+          <div class="sentiment-bar-fill" id="sentiment-bar-fill"></div>
+        </div>
+        <p class="sentiment-summary" id="sentiment-summary">-</p>
+      </article>
+      <ul class="sentiment-detail-list" id="sentiment-detail-list" hidden></ul>
+      <p class="sentiment-disclaimer">
+        선행지수 방향성을 단순 집계한 참고용 게이지이며, 다음날 지수 등락을 예측하지 않습니다. 투자 자문이 아니며 투자 판단과 책임은 본인에게 있습니다.
+      </p>
+    </section>
+
     <section class="leading-section" id="leading-section">
       <h2 class="section-title">선행지수</h2>
 
