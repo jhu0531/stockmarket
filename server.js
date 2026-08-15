@@ -74,8 +74,7 @@ app.get('/api/indices', async (req, res) => {
 
 // US indices (Dow, Nasdaq, S&P 500, Philadelphia Semiconductor) via Naver, USD/KRW
 // and 증시자금동향 (customer deposits / margin balance) scraped from Naver Finance,
-// US 10Y Treasury yield & 10Y-2Y spread via FRED's public CSV export, and OECD's
-// Composite Leading Indicator (Korea) / Business Confidence Indicator (China).
+// and US 10Y Treasury yield & 10Y-2Y spread via FRED's public CSV export.
 const LEADING_INDICATOR_SOURCES = {
   us: () => fetchNaverIndices({ market: 'worldstock', symbols: '.DJI,.IXIC,.INX,.SOX' }),
   usStocks: () =>
@@ -85,14 +84,6 @@ const LEADING_INDICATOR_SOURCES = {
       symbols: 'NVDA.O,GOOGL.O,MSFT.O,AAPL.O,AMZN.O,TSLA.O',
     }),
   vix: () => fetchNaverIndices({ market: 'worldstock', symbols: '.VIX' }),
-  oecdCli: () =>
-    fetchOecdSeries(
-      'https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.1/KOR.M.LI...AA...H?format=csv'
-    ),
-  chinaBci: () =>
-    fetchOecdSeries(
-      'https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_BTS,4.0/CHN.M........?format=csv'
-    ),
   usdKrw: fetchUsdKrw,
   yield10y: () => fetchFredSeries('DGS10'),
   spread10y2y: () => fetchFredSeries('T10Y2Y'),
@@ -135,8 +126,6 @@ app.get('/api/leading-indicators', async (req, res) => {
     us: values.us || [],
     usStocks: values.usStocks || [],
     vix: (values.vix && values.vix[0]) || null,
-    oecdCli: values.oecdCli,
-    chinaBci: values.chinaBci,
     usdKrw: values.usdKrw,
     usTreasury: { yield10y: values.yield10y, spread10y2y: values.spread10y2y },
     rates: {
@@ -165,36 +154,6 @@ function directionOf(change) {
   if (change > 0) return 'RISING';
   if (change < 0) return 'FALLING';
   return 'EVEN';
-}
-
-// Generic reader for OECD's SDMX CSV export: sorts rows by TIME_PERIOD and
-// returns the latest observation plus its change from the prior period.
-async function fetchOecdSeries(url) {
-  const upstream = await fetchWithRetry(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-
-  const csv = await upstream.text();
-  const rows = csv
-    .trim()
-    .split('\n')
-    .slice(1)
-    .map((line) => line.split(','))
-    .map((cols) => ({ period: cols[10], value: Number(cols[11]) }))
-    .filter((row) => row.period && !Number.isNaN(row.value))
-    .sort((a, b) => (a.period < b.period ? 1 : -1));
-
-  const [latest, previous] = rows;
-  if (!latest) return null;
-
-  const change = previous ? latest.value - previous.value : null;
-
-  return {
-    period: latest.period,
-    value: latest.value,
-    previousPeriod: previous ? previous.period : null,
-    previousValue: previous ? previous.value : null,
-    change,
-    direction: directionOf(change),
-  };
 }
 
 // FRED's fredgraph.csv export needs no API key. Returns the latest observation
