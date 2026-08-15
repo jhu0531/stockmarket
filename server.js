@@ -1,7 +1,11 @@
+require('dotenv').config();
+
 const express = require('express');
 const path = require('path');
 const cheerio = require('cheerio');
 const iconv = require('iconv-lite');
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,6 +14,22 @@ const NY_KEYWORDS = ['뉴욕증시', '다우지수', '나스닥', 'S&P', '월가
 const KR_KEYWORDS = ['코스피', '코스닥', '국내증시', '증시', '거래소'];
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Firestore stores the daily signal-vs-KOSPI history for the 통계 tab. Falls
+// back to disabled (rather than crashing) when credentials aren't set.
+let db = null;
+if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+  const firebaseApp = initializeApp({
+    credential: cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    }),
+  });
+  db = getFirestore(firebaseApp);
+} else {
+  console.warn('Firebase credentials not set; /api/stats will be unavailable.');
+}
 
 const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 500;
@@ -150,7 +170,83 @@ app.get('/api/leading-indicators', async (req, res) => {
 
   payload.signalScore = computeSignalScore(payload);
 
+  // Fire-and-forget: don't let history capture slow down or break the response.
+  captureSignalHistory(payload.signalScore).catch((err) =>
+    console.error('Failed to capture signal history:', err.message)
+  );
+
   res.json(payload);
+});
+
+function todayKstDateString() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+}
+
+function evaluateCorrectness(signalLabel, kospiDirection) {
+  if (!kospiDirection || kospiDirection === 'EVEN') return null;
+  if (signalLabel === 'FAVORABLE') return kospiDirection === 'RISING';
+  return kospiDirection === 'FALLING';
+}
+
+// Records one row per KST day: the morning's signal call (frozen once set)
+// plus KOSPI's latest known direction (refreshed on every visit that day,
+// so it naturally settles to the closing direction after market close).
+async function captureSignalHistory(signalScore) {
+  if (!db || !signalScore || !signalScore.maxScore) return;
+
+  const date = todayKstDateString();
+  const docRef = db.collection('signalHistory').doc(date);
+  const [existing, kospi] = await Promise.all([
+    docRef.get(),
+    fetchNaverIndices({ market: 'domestic', symbols: 'KOSPI' }),
+  ]);
+  const kospiDirection = kospi[0] ? kospi[0].direction : null;
+
+  if (!existing.exists) {
+    await docRef.set({
+      date,
+      signalLabel: signalScore.label,
+      signalScore: signalScore.score,
+      kospiDirection,
+      correct: evaluateCorrectness(signalScore.label, kospiDirection),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return;
+  }
+
+  const stored = existing.data();
+  await docRef.update({
+    kospiDirection,
+    correct: evaluateCorrectness(stored.signalLabel, kospiDirection),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+}
+
+// Returns the recorded signal-vs-KOSPI history for the 통계 tab.
+app.get('/api/stats', async (req, res) => {
+  if (!db) {
+    res.status(503).json({ error: 'Stats storage not configured' });
+    return;
+  }
+
+  try {
+    const snapshot = await db.collection('signalHistory').orderBy('date', 'desc').limit(90).get();
+    const rows = snapshot.docs.map((doc) => doc.data());
+    const decided = rows.filter((r) => r.correct !== null && r.correct !== undefined);
+    const correctCount = decided.filter((r) => r.correct).length;
+
+    res.json({
+      rows,
+      summary: {
+        total: decided.length,
+        correct: correctCount,
+        accuracy: decided.length ? (correctCount / decided.length) * 100 : null,
+      },
+    });
+  } catch (err) {
+    console.error('Failed to fetch stats:', err.message);
+    res.status(502).json({ error: 'Failed to fetch stats' });
+  }
 });
 
 function directionOf(change) {
@@ -216,9 +312,9 @@ function computeSignalScore(payload) {
   const bearishCount = signals.filter((s) => s.impact < 0).length;
   const neutralCount = signals.length - bullishCount - bearishCount;
 
-  let label = 'NEUTRAL';
-  if (score >= 5) label = 'FAVORABLE';
-  else if (score <= -5) label = 'UNFAVORABLE';
+  // Two-way call: ties (score === 0) default to UNFAVORABLE so every day
+  // gets a definite label to score against the next day's actual result.
+  const label = score > 0 ? 'FAVORABLE' : 'UNFAVORABLE';
 
   return {
     score,

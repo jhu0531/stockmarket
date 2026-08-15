@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>통계 | 주린이 기우제</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png" sizes="32x32" />
+  <link rel="icon" type="image/png" href="/icons/favicon-16.png" sizes="16x16" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#14161a" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1>주린이 기우제</h1>
+      <p class="subtitle">선행지수 심리 게이지 vs 코스피 실제 결과</p>
+      <nav class="site-nav">
+        <a href="/" class="site-nav-link">대시보드</a>
+        <a href="/stats.html" class="site-nav-link active">통계</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="stats-summary-section">
+      <article class="stats-summary-card" id="stats-summary-card">
+        <p class="stats-summary-label" id="stats-summary-label">불러오는 중...</p>
+        <p class="stats-summary-detail" id="stats-summary-detail">-</p>
+      </article>
+      <p class="sentiment-disclaimer">
+        매일 최초 방문 시점의 심리 게이지 판정과, 그날 코스피가 실제로 상승했는지 하락했는지를 비교해 하루 1건씩 기록합니다.
+        표본이 적을 때는 적중률이 크게 흔들릴 수 있습니다. 투자 자문이 아닙니다.
+      </p>
+    </section>
+
+    <section class="stats-table-section">
+      <h2 class="section-title">일별 이력</h2>
+      <div class="stats-table-wrap">
+        <table class="stats-table" id="stats-table">
+          <thead>
+            <tr>
+              <th>날짜</th>
+              <th>게이지 판정</th>
+              <th>점수</th>
+              <th>코스피 결과</th>
+              <th>적중</th>
+            </tr>
+          </thead>
+          <tbody id="stats-table-body">
+            <tr>
+              <td colspan="5" class="stats-empty">불러오는 중...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>데이터 제공: 네이버 금융 · FRED · 한국은행 ECOS · Trading Economics</p>
+    </div>
+  </footer>
+
+  <script src="stats.js"></script>
+</body>
+</html>

@@ -232,14 +232,12 @@ function renderUsKrSpreadCard(card, spread) {
 }
 
 const SIGNAL_LABEL = {
-  FAVORABLE: '우호적',
-  NEUTRAL: '중립',
-  UNFAVORABLE: '비우호적',
+  FAVORABLE: '우호',
+  UNFAVORABLE: '비우호',
 };
 
 const SIGNAL_CLASS = {
   FAVORABLE: 'up',
-  NEUTRAL: 'flat',
   UNFAVORABLE: 'down',
 };
 
@@ -273,7 +271,7 @@ function renderSignalScore(signalScore) {
   }
 
   sentimentCard.classList.add(SIGNAL_CLASS[signalScore.label] || 'flat');
-  sentimentLabelEl.textContent = `${SIGNAL_LABEL[signalScore.label] || '중립'} (${signalScore.score > 0 ? '+' : ''}${signalScore.score})`;
+  sentimentLabelEl.textContent = `${SIGNAL_LABEL[signalScore.label] || '-'} (${signalScore.score > 0 ? '+' : ''}${signalScore.score})`;
   sentimentSummaryEl.textContent =
     `우호적 ${signalScore.bullishCount} · 중립 ${signalScore.neutralCount} · 비우호적 ${signalScore.bearishCount} ` +
     `(총 ${signalScore.maxScore}개 지표)`;
