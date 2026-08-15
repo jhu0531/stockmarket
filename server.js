@@ -84,6 +84,7 @@ const LEADING_INDICATOR_SOURCES = {
       type: 'stock',
       symbols: 'NVDA.O,GOOGL.O,MSFT.O,AAPL.O,AMZN.O,TSLA.O',
     }),
+  vix: () => fetchNaverIndices({ market: 'worldstock', symbols: '.VIX' }),
   oecdCli: () =>
     fetchOecdSeries(
       'https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.1/KOR.M.LI...AA...H?format=csv'
@@ -95,6 +96,14 @@ const LEADING_INDICATOR_SOURCES = {
   usdKrw: fetchUsdKrw,
   yield10y: () => fetchFredSeries('DGS10'),
   spread10y2y: () => fetchFredSeries('T10Y2Y'),
+  usFedRate: fetchUsFedRate,
+  krBaseRate: () => fetchEcosSeries('722Y001', ['0101000']),
+  bsi: () => fetchEcosSeries('512Y014', ['99988', 'BA']),
+  ccsi: () => fetchEcosSeries('511Y002', ['FME']),
+  creditSpread: fetchCreditSpread,
+  kospiFlow: () => fetchInvestorNetBuying(''),
+  kosdaqFlow: () => fetchInvestorNetBuying('02'),
+  bdi: fetchBalticDryIndex,
   fundFlow: fetchFundFlow,
   commodities: fetchCommodities,
 };
@@ -116,13 +125,35 @@ app.get('/api/leading-indicators', async (req, res) => {
     }
   });
 
+  let usKrSpread = null;
+  if (values.usFedRate && values.krBaseRate) {
+    const value = values.usFedRate.upper.value - values.krBaseRate.value;
+    usKrSpread = { value, direction: directionOf(value) };
+  }
+
   res.json({
     us: values.us || [],
     usStocks: values.usStocks || [],
+    vix: (values.vix && values.vix[0]) || null,
     oecdCli: values.oecdCli,
     chinaBci: values.chinaBci,
     usdKrw: values.usdKrw,
     usTreasury: { yield10y: values.yield10y, spread10y2y: values.spread10y2y },
+    rates: {
+      usFedRate: values.usFedRate,
+      krBaseRate: values.krBaseRate,
+      usKrSpread,
+      creditSpread: values.creditSpread,
+    },
+    sentiment: {
+      bsi: values.bsi,
+      ccsi: values.ccsi,
+    },
+    investorFlow: {
+      kospi: values.kospiFlow,
+      kosdaq: values.kosdaqFlow,
+    },
+    bdi: values.bdi,
     fundFlow: values.fundFlow,
     commodities: values.commodities || [],
     updatedAt: new Date().toISOString(),
@@ -195,6 +226,167 @@ async function fetchFredSeries(seriesId) {
     previousValue: previous ? previous.value : null,
     change,
     direction: directionOf(change),
+  };
+}
+
+// The Fed's policy rate is a target range, not a single number; Korean
+// financial media typically quote both the upper and lower bound.
+async function fetchUsFedRate() {
+  const [upper, lower] = await Promise.all([fetchFredSeries('DFEDTARU'), fetchFredSeries('DFEDTARL')]);
+  if (!upper || !lower) return null;
+  return { upper, lower };
+}
+
+function ecosPeriod(monthsAgo) {
+  const d = new Date();
+  d.setUTCMonth(d.getUTCMonth() - monthsAgo);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit' })
+    .format(d)
+    .replace('-', '');
+}
+
+// Bank of Korea's ECOS statistics API. The public "sample" key needs no
+// registration but caps results at 10 rows, so we request a short (6mo)
+// window rather than paging.
+async function fetchEcosSeries(statCode, itemCodes) {
+  const start = ecosPeriod(6);
+  const end = ecosPeriod(0);
+  const itemPath = itemCodes.join('/');
+  const url = `https://ecos.bok.or.kr/api/StatisticSearch/sample/json/kr/1/10/${statCode}/M/${start}/${end}/${itemPath}`;
+
+  const upstream = await fetchWithRetry(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  const data = await upstream.json();
+  const rows = (data.StatisticSearch && data.StatisticSearch.row) || [];
+
+  const parsed = rows
+    .map((r) => ({ period: r.TIME, value: Number(r.DATA_VALUE) }))
+    .filter((r) => r.period && !Number.isNaN(r.value))
+    .sort((a, b) => (a.period < b.period ? 1 : -1));
+
+  const [latest, previous] = parsed;
+  if (!latest) return null;
+
+  const change = previous ? latest.value - previous.value : null;
+
+  return {
+    period: latest.period,
+    value: latest.value,
+    previousPeriod: previous ? previous.period : null,
+    previousValue: previous ? previous.value : null,
+    change,
+    direction: directionOf(change),
+  };
+}
+
+// Naver's interestDetail page uses the same per-digit <span> markup as the FX
+// page; fetches 국고채(3년)/회사채(3년) and returns the credit spread.
+async function fetchNaverRate(marketindexCd) {
+  const upstream = await fetchWithRetry(
+    `https://finance.naver.com/marketindex/interestDetail.naver?marketindexCd=${marketindexCd}`,
+    { headers: { 'User-Agent': 'Mozilla/5.0' } }
+  );
+
+  const buffer = Buffer.from(await upstream.arrayBuffer());
+  const html = iconv.decode(buffer, 'euc-kr');
+  const $ = cheerio.load(html);
+
+  const priceEl = $('.no_today').children('em').first();
+  const value = Number(readDigitSpans(priceEl));
+  if (Number.isNaN(value)) return null;
+
+  const direction = priceEl.hasClass('no_up') ? 'RISING' : priceEl.hasClass('no_down') ? 'FALLING' : 'EVEN';
+  const changeEms = $('.no_exday').children('em');
+  const rawChange = Number(readDigitSpans(changeEms.eq(0)));
+
+  return {
+    value,
+    change: direction === 'FALLING' ? -rawChange : rawChange,
+    direction,
+    date: $('.exchange_info .date').first().text().trim(),
+  };
+}
+
+async function fetchCreditSpread() {
+  const [govt, corp] = await Promise.all([fetchNaverRate('IRR_GOVT03Y'), fetchNaverRate('IRR_CORP03Y')]);
+  if (!govt || !corp) return null;
+
+  const value = corp.value - govt.value;
+  const change = corp.change - govt.change;
+
+  return {
+    value,
+    change,
+    direction: directionOf(change),
+    govt3y: govt.value,
+    corp3y: corp.value,
+    date: govt.date,
+  };
+}
+
+// Naver's "일자별 순매수" (daily net buying) widget for the whole KOSPI/KOSDAQ
+// market. sosok='' is KOSPI, sosok='02' is KOSDAQ. bizdate must be a real date
+// (today's KST date works; the page just returns the most recent trading days).
+async function fetchInvestorNetBuying(sosok) {
+  const bizdate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date()).replace(/-/g, '');
+  const upstream = await fetchWithRetry(
+    `https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate=${bizdate}&sosok=${sosok}`,
+    { headers: { 'User-Agent': 'Mozilla/5.0' } }
+  );
+
+  const buffer = Buffer.from(await upstream.arrayBuffer());
+  const html = iconv.decode(buffer, 'euc-kr');
+  const $ = cheerio.load(html);
+
+  const row = $('td.date2').first().closest('tr');
+  if (!row.length) return null;
+
+  const cells = row.find('td');
+  // Column order: 날짜, 개인, 외국인, 기관계, ...기관 세부..., 기타법인
+  const parseCell = (i) => {
+    const text = cells.eq(i).text().trim().replace(/,/g, '');
+    return Number(text);
+  };
+
+  const foreign = parseCell(2);
+  const institution = parseCell(3);
+  if (Number.isNaN(foreign) || Number.isNaN(institution)) return null;
+
+  return {
+    date: cells.eq(0).text().trim(),
+    foreign: { value: foreign, direction: directionOf(foreign) },
+    institution: { value: institution, direction: directionOf(institution) },
+  };
+}
+
+// Trading Economics' single-commodity pages (unlike the /commodities table)
+// embed a "related instruments" table where change/%change are pre-signed.
+async function fetchBalticDryIndex() {
+  const upstream = await fetchWithRetry('https://tradingeconomics.com/commodity/baltic', {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  });
+
+  const html = await upstream.text();
+  const $ = cheerio.load(html);
+
+  const row = $('tr[data-symbol="BDIY:IND"]').first();
+  if (!row.length) return null;
+
+  const price = row.find('#p').first().text().trim();
+  const change = row.find('#nch').first().text().trim();
+  const changeRatio = row.find('#pch').first().text().trim().replace('%', '');
+  const changeValue = Number(change);
+
+  return {
+    price,
+    change,
+    changeRatio,
+    direction: directionOf(changeValue),
+    date: row.find('#date').first().text().trim(),
   };
 }
 
