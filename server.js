@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const cheerio = require('cheerio');
 const iconv = require('iconv-lite');
 const { initializeApp, cert } = require('firebase-admin/app');
@@ -12,6 +13,86 @@ const PORT = process.env.PORT || 3000;
 
 const NY_KEYWORDS = ['뉴욕증시', '다우지수', '나스닥', 'S&P', '월가', '뉴욕 증시'];
 const KR_KEYWORDS = ['코스피', '코스닥', '국내증시', '증시', '거래소'];
+
+// KNU Korean Sentiment Dictionary (군산대 DILAB, github.com/park1200656/KnuSentiLex)
+// — ~14,800 general-purpose Korean words scored -2 (very negative) to +2
+// (very positive). Used to score news headlines locally, no API calls.
+const SENTI_DICT = new Map();
+try {
+  const raw = fs.readFileSync(path.join(__dirname, 'data', 'knu-senti-word-dict.txt'), 'utf8');
+  raw
+    .replace(/^﻿/, '')
+    .split('\n')
+    .forEach((line) => {
+      const [word, polarityStr] = line.trim().split('\t');
+      const polarity = Number(polarityStr);
+      if (!word || word.length < 2 || Number.isNaN(polarity) || polarity === 0) return;
+      SENTI_DICT.set(word, polarity);
+    });
+  console.log(`Loaded ${SENTI_DICT.size} sentiment dictionary entries`);
+} catch (err) {
+  console.warn('Failed to load sentiment dictionary:', err.message);
+}
+
+// KNU is general-purpose and misses most market vocabulary ("급등", "실적",
+// "관리종목", ...) — testing against real headlines found zero matches
+// without this. Small hand-curated overlay, applied on top of KNU.
+const FINANCE_SENTI_WORDS = {
+  급등: 2,
+  폭등: 2,
+  껑충: 1,
+  강세: 1,
+  반등: 1,
+  훈풍: 1,
+  호조: 1,
+  개선: 1,
+  기대: 1,
+  순매수: 1,
+  사상최대: 2,
+  역대급: 2,
+  역대최고: 2,
+  최고치: 1,
+  신고가: 2,
+  흑자전환: 2,
+  어닝서프라이즈: 2,
+  깜짝실적: 2,
+  호실적: 1,
+  상승세: 1,
+  오른: 1,
+  올랐다: 1,
+  급락: -2,
+  폭락: -2,
+  약세: -1,
+  부진: -1,
+  둔화: -1,
+  우려: -1,
+  부담: -1,
+  악화: -2,
+  순매도: -1,
+  신저가: -2,
+  최저치: -1,
+  적자전환: -2,
+  어닝쇼크: -2,
+  관리종목: -2,
+  상장폐지: -2,
+  급감: -2,
+  내렸다: -1,
+  하락세: -1,
+  후퇴: -1,
+};
+Object.entries(FINANCE_SENTI_WORDS).forEach(([word, polarity]) => SENTI_DICT.set(word, polarity));
+
+// Sums dictionary word matches found as substrings across the given texts.
+// Crude (no tokenization) but dependency-free and fast enough for a handful
+// of headlines per request.
+function scoreKoreanSentiment(texts) {
+  const joined = texts.join(' ');
+  let score = 0;
+  for (const [word, polarity] of SENTI_DICT) {
+    if (joined.includes(word)) score += polarity;
+  }
+  return { score, direction: directionOf(score) };
+}
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -117,6 +198,14 @@ const LEADING_INDICATOR_SOURCES = {
   bdi: fetchBalticDryIndex,
   fundFlow: fetchFundFlow,
   commodities: fetchCommodities,
+  krNewsSentiment: async () => {
+    const news = await scrapeNaverNews(401, KR_KEYWORDS, 3);
+    return scoreKoreanSentiment(news.map((item) => `${item.title} ${item.summary}`));
+  },
+  nyNewsSentiment: async () => {
+    const news = await scrapeNaverNews(403, NY_KEYWORDS, 3);
+    return scoreKoreanSentiment(news.map((item) => `${item.title} ${item.summary}`));
+  },
 };
 
 // Each source is fetched from a different, independently flaky upstream, so a
@@ -165,6 +254,10 @@ async function buildLeadingIndicatorsPayload() {
     bdi: values.bdi,
     fundFlow: values.fundFlow,
     commodities: values.commodities || [],
+    newsSentiment: {
+      domestic: values.krNewsSentiment,
+      foreign: values.nyNewsSentiment,
+    },
     updatedAt: new Date().toISOString(),
   };
 
@@ -346,6 +439,8 @@ function computeSignalScore(payload) {
   }
   if (payload.bdi) addSignal('BDI (발틱운임지수)', payload.bdi.direction);
   if (payload.fundFlow && payload.fundFlow.deposits) addSignal('고객예탁금', payload.fundFlow.deposits.direction);
+  if (payload.newsSentiment.domestic) addSignal('국내뉴스 심리', payload.newsSentiment.domestic.direction);
+  if (payload.newsSentiment.foreign) addSignal('해외뉴스 심리', payload.newsSentiment.foreign.direction);
 
   const score = signals.reduce((sum, s) => sum + s.impact, 0);
   const bullishCount = signals.filter((s) => s.impact > 0).length;
