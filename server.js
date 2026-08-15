@@ -121,7 +121,7 @@ const LEADING_INDICATOR_SOURCES = {
 
 // Each source is fetched from a different, independently flaky upstream, so a
 // single failure (e.g. a rate limit) shouldn't blank out the whole response.
-app.get('/api/leading-indicators', async (req, res) => {
+async function buildLeadingIndicatorsPayload() {
   const keys = Object.keys(LEADING_INDICATOR_SOURCES);
   const results = await Promise.allSettled(keys.map((key) => LEADING_INDICATOR_SOURCES[key]()));
 
@@ -169,8 +169,15 @@ app.get('/api/leading-indicators', async (req, res) => {
   };
 
   payload.signalScore = computeSignalScore(payload);
+  return payload;
+}
 
-  // Fire-and-forget: don't let history capture slow down or break the response.
+app.get('/api/leading-indicators', async (req, res) => {
+  const payload = await buildLeadingIndicatorsPayload();
+
+  // Fire-and-forget backup capture, in case the daily cron trigger missed.
+  // KOSPI's open-vs-previous-close direction doesn't change during the day,
+  // so this is safe to repeat and never overwrites an already-frozen signal.
   captureSignalHistory(payload.signalScore).catch((err) =>
     console.error('Failed to capture signal history:', err.message)
   );
@@ -178,8 +185,26 @@ app.get('/api/leading-indicators', async (req, res) => {
   res.json(payload);
 });
 
+// Dedicated endpoint for the daily GitHub Actions cron trigger, so history is
+// recorded even if nobody visits the site that day.
+app.get('/api/stats/capture', async (req, res) => {
+  try {
+    const payload = await buildLeadingIndicatorsPayload();
+    await captureSignalHistory(payload.signalScore);
+    res.json({ ok: true, date: todayKstDateString(), signalScore: payload.signalScore });
+  } catch (err) {
+    console.error('Manual signal capture failed:', err.message);
+    res.status(502).json({ error: 'Capture failed' });
+  }
+});
+
 function todayKstDateString() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+}
+
+function isKstWeekend() {
+  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', weekday: 'short' }).format(new Date());
+  return weekday === 'Sat' || weekday === 'Sun';
 }
 
 function evaluateCorrectness(signalLabel, kospiDirection) {
@@ -188,19 +213,34 @@ function evaluateCorrectness(signalLabel, kospiDirection) {
   return kospiDirection === 'FALLING';
 }
 
-// Records one row per KST day: the morning's signal call (frozen once set)
-// plus KOSPI's latest known direction (refreshed on every visit that day,
-// so it naturally settles to the closing direction after market close).
+// KOSPI's opening print vs the previous close — fixed once the market opens,
+// so unlike "current price" this doesn't drift depending on when it's read.
+async function fetchKospiOpenDirection() {
+  const upstream = await fetchWithRetry(
+    'https://polling.finance.naver.com/api/realtime/domestic/index/KOSPI',
+    { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://finance.naver.com/' } }
+  );
+  const data = await upstream.json();
+  const item = data.datas[0];
+  if (!item) return null;
+
+  const open = Number(item.openPriceRaw);
+  const current = Number(item.closePriceRaw);
+  const changeFromPrevClose = Number(item.compareToPreviousClosePriceRaw);
+  if ([open, current, changeFromPrevClose].some((n) => Number.isNaN(n))) return null;
+
+  const previousClose = current - changeFromPrevClose;
+  return directionOf(open - previousClose);
+}
+
+// Records one row per KST day (skipping weekends): the morning's signal call
+// (frozen once set) plus KOSPI's open-vs-previous-close direction.
 async function captureSignalHistory(signalScore) {
-  if (!db || !signalScore || !signalScore.maxScore) return;
+  if (!db || !signalScore || !signalScore.maxScore || isKstWeekend()) return;
 
   const date = todayKstDateString();
   const docRef = db.collection('signalHistory').doc(date);
-  const [existing, kospi] = await Promise.all([
-    docRef.get(),
-    fetchNaverIndices({ market: 'domestic', symbols: 'KOSPI' }),
-  ]);
-  const kospiDirection = kospi[0] ? kospi[0].direction : null;
+  const [existing, kospiDirection] = await Promise.all([docRef.get(), fetchKospiOpenDirection()]);
 
   if (!existing.exists) {
     await docRef.set({

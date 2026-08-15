@@ -1,0 +1,14 @@
+name: Daily signal capture
+
+on:
+  schedule:
+    # 00:05 UTC = 09:05 KST, shortly after KOSPI's market open
+    - cron: '5 0 * * 1-5'
+  workflow_dispatch: {}
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger capture endpoint
+        run: curl -sf https://stockmarket-bgh0.onrender.com/api/stats/capture
