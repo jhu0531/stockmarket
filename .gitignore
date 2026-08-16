@@ -2,3 +2,4 @@ node_modules/
 .claude/
 .env
 *firebase-adminsdk*.json
+PROJECT_CONTEXT.md
