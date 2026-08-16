@@ -507,13 +507,36 @@ const loadNyNews = setupNewsSection({
   errorText: '뉴욕증시 뉴스를 불러오지 못했습니다.',
 });
 
-const loadKrNews = setupNewsSection({
-  apiUrl: '/api/kr-news',
-  listId: 'kr-news-list',
-  toggleId: 'kr-news-section-toggle',
-  emptyText: '표시할 국내증시 뉴스가 없습니다.',
-  errorText: '국내증시 뉴스를 불러오지 못했습니다.',
-});
+// 국내뉴스 has two sub-lists (거시경제/미시경제) sharing one section toggle
+// and one API call, so it doesn't fit the single-list setupNewsSection shape.
+function setupKrNewsSection() {
+  const bodyEl = document.getElementById('kr-news-body');
+  const toggleEl = document.getElementById('kr-news-section-toggle');
+  const macroListEl = document.getElementById('kr-news-macro-list');
+  const microListEl = document.getElementById('kr-news-micro-list');
+
+  toggleEl.addEventListener('click', () => {
+    const isOpen = toggleEl.getAttribute('aria-expanded') === 'true';
+    toggleEl.setAttribute('aria-expanded', String(!isOpen));
+    toggleEl.textContent = isOpen ? '펼치기' : '접기';
+    bodyEl.hidden = isOpen;
+  });
+
+  return async function load() {
+    try {
+      const res = await fetch('/api/kr-news');
+      if (!res.ok) throw new Error('요청 실패');
+      const data = await res.json();
+      renderNews(macroListEl, data.macro, '표시할 거시경제 뉴스가 없습니다.');
+      renderNews(microListEl, data.micro, '표시할 미시경제 뉴스가 없습니다.');
+    } catch (err) {
+      renderNews(macroListEl, [], '거시경제 뉴스를 불러오지 못했습니다.');
+      renderNews(microListEl, [], '미시경제 뉴스를 불러오지 못했습니다.');
+    }
+  };
+}
+
+const loadKrNews = setupKrNewsSection();
 
 refreshBtn.addEventListener('click', () => {
   loadIndices();

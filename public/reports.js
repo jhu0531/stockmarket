@@ -17,6 +17,13 @@ function renderReports(reports) {
     const li = document.createElement('li');
     li.className = 'report-item';
 
+    if (report.stockName) {
+      const stock = document.createElement('span');
+      stock.className = 'report-stock';
+      stock.textContent = report.stockName;
+      li.appendChild(stock);
+    }
+
     const titleLink = document.createElement('a');
     titleLink.className = 'report-title';
     titleLink.href = report.link || '#';

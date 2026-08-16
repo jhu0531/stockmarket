@@ -850,11 +850,15 @@ app.get('/api/ny-news', async (req, res) => {
   }
 });
 
-// "시황.전망" news list, filtered for KOSPI/KOSDAQ domestic-market coverage
+// 국내뉴스: "시황.전망"(401) = 거시경제, "기업.종목분석"(402) = 미시경제.
+// Both boards are already domestic-market-scoped, so no keyword filter needed.
 app.get('/api/kr-news', async (req, res) => {
   try {
-    const news = await scrapeNaverNews(401, KR_KEYWORDS, 3);
-    res.json({ news, updatedAt: new Date().toISOString() });
+    const [macro, micro] = await Promise.all([
+      scrapeNaverNews(401, null, 3),
+      scrapeNaverNews(402, null, 3),
+    ]);
+    res.json({ macro, micro, updatedAt: new Date().toISOString() });
   } catch (err) {
     console.error('Failed to fetch domestic market news:', err.message);
     res.status(502).json({ error: 'Failed to fetch domestic market news' });
@@ -977,9 +981,11 @@ app.get('/api/calendar', async (req, res) => {
   }
 });
 
-// Scrapes Naver Finance's "시황정보" (market commentary) research report board.
-async function fetchMarketReports(limit = 20) {
-  const upstream = await fetchWithRetry('https://finance.naver.com/research/market_info_list.naver', {
+// Scrapes Naver Finance's "종목분석" (individual-stock analysis) research
+// report board. Unlike the market-commentary board, each row leads with a
+// 종목명 (stock name) column before the title.
+async function fetchCompanyReports(limit = 20) {
+  const upstream = await fetchWithRetry('https://finance.naver.com/research/company_list.naver', {
     headers: { 'User-Agent': 'Mozilla/5.0' },
   });
 
@@ -990,16 +996,19 @@ async function fetchMarketReports(limit = 20) {
   const reports = [];
   $('table.type_1 tr').each((_, el) => {
     const row = $(el);
-    const titleLink = row.find('td').eq(0).find('a').first();
+    const cells = row.find('td');
+    const titleLink = cells.eq(1).find('a').first();
     const title = titleLink.text().trim();
     if (!title) return;
 
+    const stockName = cells.eq(0).find('a').first().text().trim();
     const href = titleLink.attr('href');
-    const firm = row.find('td').eq(1).text().trim();
+    const firm = cells.eq(2).text().trim();
     const pdfLink = row.find('td.file a').first().attr('href') || null;
     const date = row.find('td.date').first().text().trim();
 
     reports.push({
+      stockName,
       title,
       firm,
       date,
@@ -1013,11 +1022,11 @@ async function fetchMarketReports(limit = 20) {
 
 app.get('/api/reports', async (req, res) => {
   try {
-    const reports = await fetchMarketReports(20);
+    const reports = await fetchCompanyReports(20);
     res.json({ reports, updatedAt: new Date().toISOString() });
   } catch (err) {
-    console.error('Failed to fetch market reports:', err.message);
-    res.status(502).json({ error: 'Failed to fetch market reports' });
+    console.error('Failed to fetch company analysis reports:', err.message);
+    res.status(502).json({ error: 'Failed to fetch company analysis reports' });
   }
 });
 

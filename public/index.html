@@ -63,13 +63,20 @@
     <section class="news-section" id="kr-news-section">
       <div class="section-header">
         <h2 class="section-title">국내뉴스</h2>
-        <button id="kr-news-section-toggle" class="section-toggle" type="button" aria-expanded="false" aria-controls="kr-news-list">
+        <button id="kr-news-section-toggle" class="section-toggle" type="button" aria-expanded="false" aria-controls="kr-news-body">
           펼치기
         </button>
       </div>
-      <ul class="news-list" id="kr-news-list" hidden>
-        <li class="news-item news-loading">불러오는 중...</li>
-      </ul>
+      <div id="kr-news-body" hidden>
+        <h3 class="news-subheading">거시경제</h3>
+        <ul class="news-list" id="kr-news-macro-list">
+          <li class="news-item news-loading">불러오는 중...</li>
+        </ul>
+        <h3 class="news-subheading">미시경제</h3>
+        <ul class="news-list" id="kr-news-micro-list">
+          <li class="news-item news-loading">불러오는 중...</li>
+        </ul>
+      </div>
     </section>
 
     <div class="status-bar">
