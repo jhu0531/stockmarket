@@ -14,8 +14,16 @@
 </head>
 <body>
   <div id="loading-overlay">
-    <iframe id="loading-frame" src="loading.html" title="로딩 중"></iframe>
+    <iframe id="loading-frame" title="로딩 중"></iframe>
   </div>
+  <script>
+    if (sessionStorage.getItem('raindanceShown')) {
+      document.getElementById('loading-overlay').remove();
+    } else {
+      sessionStorage.setItem('raindanceShown', '1');
+      document.getElementById('loading-frame').src = 'loading.html';
+    }
+  </script>
 
   <div class="app-shell">
     <nav class="sidebar">
