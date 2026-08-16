@@ -960,25 +960,82 @@ async function fetchIpoSchedule() {
   return events;
 }
 
-// Combines the fixed macro calendar with live-scraped IPO dates, filtered to
-// today and forward so the calendar page only shows what's still upcoming.
+// 대통령실 공개일정 중 경제/기업 관련만 골라낸다. 제목만으로 판단하는
+// 거친 필터라 완벽하진 않음. 이 API는 통상 가까운 1~2개월치만 채워져
+// 있어서(FOMC처럼 1년 전 공지가 아님) 그만큼만 조회한다.
+const GOV_ECONOMY_KEYWORDS = [
+  '경제',
+  '산업',
+  '기업',
+  '성장동력',
+  '수출',
+  '투자',
+  '일자리',
+  '금융',
+  '민생',
+  '무역',
+  '반도체',
+  '점검회의',
+  '업무보고',
+  '민관합동',
+];
+
+function kstYearMonth(monthOffset) {
+  const [y, m] = todayKstDateString().split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + monthOffset, 1));
+  return { year: d.getUTCFullYear(), month: String(d.getUTCMonth() + 1).padStart(2, '0') };
+}
+
+async function fetchGovSchedule() {
+  const months = [0, 1].map((offset) => kstYearMonth(offset));
+
+  const responses = await Promise.all(
+    months.map(({ year, month }) =>
+      fetchWithRetry(
+        `https://www.president.go.kr/ajaxf/frSchedule/getSchedule.do?pSiteNo=2&pYear=${year}&pMonth=${month}`,
+        { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.president.go.kr/schedule' } }
+      ).then((r) => r.json())
+    )
+  );
+
+  const events = [];
+  responses.forEach((resp) => {
+    const list = (resp.data && resp.data.list) || [];
+    list.forEach((item) => {
+      const subject = item.SUBJECT || '';
+      if (!GOV_ECONOMY_KEYWORDS.some((kw) => subject.includes(kw))) return;
+      const date = item.SCH_DT ? item.SCH_DT.replace(/\./g, '-') : null;
+      if (!date) return;
+
+      events.push({
+        date,
+        type: 'GOV',
+        title: subject.split('/')[0].trim(),
+        detail: item.SCH_PLACE || null,
+      });
+    });
+  });
+
+  return events;
+}
+
+// Combines the fixed macro calendar, live-scraped IPO dates, and the
+// president's economy-related schedule. Each source is independently
+// best-effort so one failing doesn't blank the whole calendar.
 app.get('/api/calendar', async (req, res) => {
-  try {
-    const ipoEvents = await fetchIpoSchedule();
-    const today = todayKstDateString();
+  const [ipoResult, govResult] = await Promise.allSettled([fetchIpoSchedule(), fetchGovSchedule()]);
 
-    const events = [...MACRO_EVENTS_2026, ...ipoEvents]
-      .filter((e) => e.date >= today)
-      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  if (ipoResult.status === 'rejected') console.error('Failed to fetch IPO schedule:', ipoResult.reason.message);
+  if (govResult.status === 'rejected') console.error('Failed to fetch gov schedule:', govResult.reason.message);
 
-    res.json({ events, updatedAt: new Date().toISOString() });
-  } catch (err) {
-    console.error('Failed to build calendar:', err.message);
-    // IPO scraping failed, but the fixed macro calendar is still useful.
-    const today = todayKstDateString();
-    const events = MACRO_EVENTS_2026.filter((e) => e.date >= today);
-    res.json({ events, updatedAt: new Date().toISOString(), partial: true });
-  }
+  const ipoEvents = ipoResult.status === 'fulfilled' ? ipoResult.value : [];
+  const govEvents = govResult.status === 'fulfilled' ? govResult.value : [];
+
+  const events = [...MACRO_EVENTS_2026, ...ipoEvents, ...govEvents].sort((a, b) =>
+    a.date < b.date ? -1 : a.date > b.date ? 1 : 0
+  );
+
+  res.json({ events, updatedAt: new Date().toISOString() });
 });
 
 // Scrapes Naver Finance's "종목분석" (individual-stock analysis) research

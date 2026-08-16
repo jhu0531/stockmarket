@@ -37,7 +37,7 @@
       <header class="site-header">
         <div class="container">
           <h1>증시캘린더</h1>
-          <p class="subtitle">IPO 일정 · FOMC · 한국은행 금통위 · 증시 휴장일</p>
+          <p class="subtitle">IPO 일정 · FOMC · 한국은행 금통위 · 증시 휴장일 · 정부일정</p>
         </div>
       </header>
 
@@ -46,15 +46,28 @@
           <span class="legend-item"><span class="legend-dot dot-ipo"></span>IPO</span>
           <span class="legend-item"><span class="legend-dot dot-rate"></span>금리결정</span>
           <span class="legend-item"><span class="legend-dot dot-holiday"></span>휴장일</span>
+          <span class="legend-item"><span class="legend-dot dot-gov"></span>정부일정</span>
         </div>
 
-        <ul class="calendar-list" id="calendar-list">
-          <li class="calendar-empty">불러오는 중...</li>
-        </ul>
+        <div class="calendar-nav">
+          <button type="button" id="cal-prev" class="calendar-nav-btn" aria-label="이전 달">‹</button>
+          <span class="calendar-nav-title" id="cal-title">-</span>
+          <button type="button" id="cal-next" class="calendar-nav-btn" aria-label="다음 달">›</button>
+        </div>
+
+        <div class="calendar-grid" id="calendar-grid">
+          <div class="calendar-empty">불러오는 중...</div>
+        </div>
+
+        <div class="calendar-day-detail" id="calendar-day-detail">
+          <h2 class="section-title" id="calendar-day-title">-</h2>
+          <ul class="calendar-list" id="calendar-day-list"></ul>
+        </div>
 
         <p class="sentiment-disclaimer">
           FOMC·한국은행 금통위 일정은 공식 발표 기준이며, 국내 증시 휴장일(특히 대체공휴일 지정분)은 변동될 수 있으니
-          정확한 일정은 한국거래소 공지를 확인하세요. IPO 일정은 네이버 금융 데이터를 기준으로 매일 갱신됩니다.
+          정확한 일정은 한국거래소 공지를 확인하세요. IPO 일정은 네이버 금융 데이터 기준입니다. 정부일정(대통령실 공개일정 중
+          경제·산업 관련 항목)은 통상 1~2개월 앞선 일정만 공개되며, 제목 키워드 기반 자동 분류라 정확하지 않을 수 있습니다.
         </p>
       </main>
 
