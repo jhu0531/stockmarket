@@ -904,62 +904,6 @@ const MACRO_EVENTS_2026 = [
   { date: '2026-12-31', type: 'HOLIDAY', title: '연말 휴장일' },
 ];
 
-// Naver renders IPO dates as "26.08.18" or a range "26.07.30~07.31".
-function parseNaverShortDate(str) {
-  const m = str && str.match(/(\d{2})\.(\d{2})\.(\d{2})/);
-  return m ? `20${m[1]}-${m[2]}-${m[3]}` : null;
-}
-
-async function fetchIpoSchedule() {
-  const upstream = await fetchWithRetry('https://finance.naver.com/sise/ipo.naver', {
-    headers: { 'User-Agent': 'Mozilla/5.0' },
-  });
-
-  const buffer = Buffer.from(await upstream.arrayBuffer());
-  const html = iconv.decode(buffer, 'euc-kr');
-  const $ = cheerio.load(html);
-
-  const events = [];
-  $('.item_area').each((_, el) => {
-    const row = $(el);
-    const nameLink = row.find('.item_name a').first();
-    const name = nameLink.text().trim();
-    const market = row.find('.item_name .type').first().text().trim();
-    const link = nameLink.attr('href');
-    if (!name) return;
-
-    const fields = {};
-    row.find('.lst_info > li').each((__, li) => {
-      const li$ = $(li);
-      const label = li$.find('.tit').first().text().trim();
-      const value = li$
-        .clone()
-        .find('.tit')
-        .remove()
-        .end()
-        .text()
-        .replace(/\s+/g, ' ')
-        .trim();
-      fields[label] = value;
-    });
-
-    const price = fields['공모가'] ? `공모가 ${fields['공모가']}원` : null;
-    const detail = [market, price].filter(Boolean).join(' · ');
-
-    const subscribeStart = parseNaverShortDate(fields['개인청약']);
-    if (subscribeStart) {
-      events.push({ date: subscribeStart, type: 'IPO_SUBSCRIBE', title: `${name} 공모청약 시작`, detail, link });
-    }
-
-    const listingDate = parseNaverShortDate(fields['상장일']);
-    if (listingDate) {
-      events.push({ date: listingDate, type: 'IPO_LIST', title: `${name} 상장`, detail, link });
-    }
-  });
-
-  return events;
-}
-
 // 대통령실 공개일정 중 경제/기업 관련만 골라낸다. 제목만으로 판단하는
 // 거친 필터라 완벽하진 않음. 이 API는 통상 가까운 1~2개월치만 채워져
 // 있어서(FOMC처럼 1년 전 공지가 아님) 그만큼만 조회한다.
@@ -1019,19 +963,17 @@ async function fetchGovSchedule() {
   return events;
 }
 
-// Combines the fixed macro calendar, live-scraped IPO dates, and the
-// president's economy-related schedule. Each source is independently
-// best-effort so one failing doesn't blank the whole calendar.
+// Combines the fixed macro calendar with the president's economy-related
+// schedule. Best-effort: if the gov schedule fetch fails, the fixed macro
+// calendar alone is still returned rather than failing the whole request.
 app.get('/api/calendar', async (req, res) => {
-  const [ipoResult, govResult] = await Promise.allSettled([fetchIpoSchedule(), fetchGovSchedule()]);
+  const govResult = await Promise.allSettled([fetchGovSchedule()]);
+  const [{ status, value, reason }] = govResult;
 
-  if (ipoResult.status === 'rejected') console.error('Failed to fetch IPO schedule:', ipoResult.reason.message);
-  if (govResult.status === 'rejected') console.error('Failed to fetch gov schedule:', govResult.reason.message);
+  if (status === 'rejected') console.error('Failed to fetch gov schedule:', reason.message);
+  const govEvents = status === 'fulfilled' ? value : [];
 
-  const ipoEvents = ipoResult.status === 'fulfilled' ? ipoResult.value : [];
-  const govEvents = govResult.status === 'fulfilled' ? govResult.value : [];
-
-  const events = [...MACRO_EVENTS_2026, ...ipoEvents, ...govEvents].sort((a, b) =>
+  const events = [...MACRO_EVENTS_2026, ...govEvents].sort((a, b) =>
     a.date < b.date ? -1 : a.date > b.date ? 1 : 0
   );
 

@@ -1,6 +1,4 @@
 const TYPE_LABEL = {
-  IPO_SUBSCRIBE: '공모청약',
-  IPO_LIST: '신규상장',
   RATE_KR: '금통위',
   RATE_US: 'FOMC',
   HOLIDAY: '휴장일',
@@ -8,8 +6,6 @@ const TYPE_LABEL = {
 };
 
 const TYPE_CLASS = {
-  IPO_SUBSCRIBE: 'dot-ipo',
-  IPO_LIST: 'dot-ipo',
   RATE_KR: 'dot-rate',
   RATE_US: 'dot-rate',
   HOLIDAY: 'dot-holiday',
@@ -120,10 +116,15 @@ function renderMonthGrid() {
   for (let day = 1; day <= daysInMonth; day += 1) {
     const dateStr = `${viewYear}-${pad2(viewMonth)}-${pad2(day)}`;
     const events = eventsByDate.get(dateStr) || [];
+    const weekdayIdx = (startWeekday + day - 1) % 7;
+    const isHoliday = events.some((event) => event.type === 'HOLIDAY');
+    const isWeekend = weekdayIdx === 0 || weekdayIdx === 6;
 
     const cell = document.createElement('button');
     cell.type = 'button';
     cell.className = 'calendar-cell';
+    if (isWeekend) cell.classList.add('is-weekend');
+    if (isHoliday) cell.classList.add('is-holiday');
     if (dateStr === today) cell.classList.add('is-today');
     if (dateStr === selectedDate) cell.classList.add('is-selected');
 
@@ -133,14 +134,21 @@ function renderMonthGrid() {
     cell.appendChild(num);
 
     if (events.length) {
-      const dots = document.createElement('span');
-      dots.className = 'calendar-cell-dots';
-      events.slice(0, 4).forEach((event) => {
-        const dot = document.createElement('span');
-        dot.className = `calendar-cell-dot ${TYPE_CLASS[event.type] || ''}`;
-        dots.appendChild(dot);
+      const list = document.createElement('span');
+      list.className = 'calendar-cell-events';
+      events.slice(0, 3).forEach((event) => {
+        const item = document.createElement('span');
+        item.className = `calendar-cell-event ${TYPE_CLASS[event.type] || ''}`;
+        item.textContent = event.title;
+        list.appendChild(item);
       });
-      cell.appendChild(dots);
+      if (events.length > 3) {
+        const more = document.createElement('span');
+        more.className = 'calendar-cell-event calendar-cell-more';
+        more.textContent = `+${events.length - 3}`;
+        list.appendChild(more);
+      }
+      cell.appendChild(list);
     }
 
     cell.addEventListener('click', () => {
