@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>증시리포트 | 주린이 기우제</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png" sizes="32x32" />
+  <link rel="icon" type="image/png" href="/icons/favicon-16.png" sizes="16x16" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#14161a" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="loading-overlay">
+    <iframe id="loading-frame" src="loading.html" title="로딩 중"></iframe>
+  </div>
+
+  <div class="app-shell">
+    <nav class="sidebar">
+      <div class="sidebar-brand">🪶 주린이 기우제</div>
+      <a href="/" class="sidebar-link"><span class="sidebar-icon">🏠</span><span>홈</span></a>
+      <a href="/calendar.html" class="sidebar-link"><span class="sidebar-icon">📅</span><span>증시캘린더</span></a>
+      <a href="/reports.html" class="sidebar-link active"><span class="sidebar-icon">📄</span><span>증시리포트</span></a>
+    </nav>
+
+    <div class="app-content">
+      <header class="site-header">
+        <div class="container">
+          <h1>증시리포트</h1>
+          <p class="subtitle">증권사 시황정보 리포트</p>
+        </div>
+      </header>
+
+      <main class="container">
+        <ul class="report-list" id="report-list">
+          <li class="calendar-empty">불러오는 중...</li>
+        </ul>
+      </main>
+
+      <footer class="site-footer">
+        <div class="container">
+          <p>데이터 제공: 네이버 금융 리서치</p>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script src="reports.js"></script>
+</body>
+</html>

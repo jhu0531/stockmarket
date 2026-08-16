@@ -17,18 +17,27 @@
     <iframe id="loading-frame" src="loading.html" title="로딩 중"></iframe>
   </div>
 
-  <header class="site-header">
-    <div class="container">
-      <h1>주린이 기우제</h1>
-      <p class="subtitle">선행지수 심리 게이지 vs 코스피 실제 결과</p>
-      <nav class="site-nav">
-        <a href="/" class="site-nav-link">대시보드</a>
-        <a href="/stats.html" class="site-nav-link active">통계</a>
-      </nav>
-    </div>
-  </header>
+  <div class="app-shell">
+    <nav class="sidebar">
+      <div class="sidebar-brand">🪶 주린이 기우제</div>
+      <a href="/" class="sidebar-link active"><span class="sidebar-icon">🏠</span><span>홈</span></a>
+      <a href="/calendar.html" class="sidebar-link"><span class="sidebar-icon">📅</span><span>증시캘린더</span></a>
+      <a href="/reports.html" class="sidebar-link"><span class="sidebar-icon">📄</span><span>증시리포트</span></a>
+    </nav>
 
-  <main class="container">
+    <div class="app-content">
+      <header class="site-header">
+        <div class="container">
+          <h1>주린이 기우제</h1>
+          <p class="subtitle">선행지수 심리 게이지 vs 코스피 실제 결과</p>
+          <nav class="site-nav">
+            <a href="/" class="site-nav-link">대시보드</a>
+            <a href="/stats.html" class="site-nav-link active">통계</a>
+          </nav>
+        </div>
+      </header>
+
+      <main class="container">
     <section class="stats-summary-section">
       <article class="stats-summary-card" id="stats-summary-card">
         <p class="stats-summary-label" id="stats-summary-label">불러오는 중...</p>
@@ -62,13 +71,15 @@
         </table>
       </div>
     </section>
-  </main>
+      </main>
 
-  <footer class="site-footer">
-    <div class="container">
-      <p>데이터 제공: 네이버 금융 · FRED · 한국은행 ECOS · Trading Economics</p>
+      <footer class="site-footer">
+        <div class="container">
+          <p>데이터 제공: 네이버 금융 · FRED · 한국은행 ECOS · Trading Economics</p>
+        </div>
+      </footer>
     </div>
-  </footer>
+  </div>
 
   <script src="stats.js"></script>
 </body>

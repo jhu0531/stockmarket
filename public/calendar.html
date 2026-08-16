@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>증시캘린더 | 주린이 기우제</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png" sizes="32x32" />
+  <link rel="icon" type="image/png" href="/icons/favicon-16.png" sizes="16x16" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#14161a" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="loading-overlay">
+    <iframe id="loading-frame" src="loading.html" title="로딩 중"></iframe>
+  </div>
+
+  <div class="app-shell">
+    <nav class="sidebar">
+      <div class="sidebar-brand">🪶 주린이 기우제</div>
+      <a href="/" class="sidebar-link"><span class="sidebar-icon">🏠</span><span>홈</span></a>
+      <a href="/calendar.html" class="sidebar-link active"><span class="sidebar-icon">📅</span><span>증시캘린더</span></a>
+      <a href="/reports.html" class="sidebar-link"><span class="sidebar-icon">📄</span><span>증시리포트</span></a>
+    </nav>
+
+    <div class="app-content">
+      <header class="site-header">
+        <div class="container">
+          <h1>증시캘린더</h1>
+          <p class="subtitle">IPO 일정 · FOMC · 한국은행 금통위 · 증시 휴장일</p>
+        </div>
+      </header>
+
+      <main class="container">
+        <div class="calendar-legend">
+          <span class="legend-item"><span class="legend-dot dot-ipo"></span>IPO</span>
+          <span class="legend-item"><span class="legend-dot dot-rate"></span>금리결정</span>
+          <span class="legend-item"><span class="legend-dot dot-holiday"></span>휴장일</span>
+        </div>
+
+        <ul class="calendar-list" id="calendar-list">
+          <li class="calendar-empty">불러오는 중...</li>
+        </ul>
+
+        <p class="sentiment-disclaimer">
+          FOMC·한국은행 금통위 일정은 공식 발표 기준이며, 국내 증시 휴장일(특히 대체공휴일 지정분)은 변동될 수 있으니
+          정확한 일정은 한국거래소 공지를 확인하세요. IPO 일정은 네이버 금융 데이터를 기준으로 매일 갱신됩니다.
+        </p>
+      </main>
+
+      <footer class="site-footer">
+        <div class="container">
+          <p>데이터 제공: 네이버 금융 · 연방준비제도 · 한국은행</p>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script src="calendar.js"></script>
+</body>
+</html>

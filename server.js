@@ -861,6 +861,166 @@ app.get('/api/kr-news', async (req, res) => {
   }
 });
 
+// Fixed 2026 macro-calendar events. FOMC/BOK dates are the official
+// pre-announced schedules; KRX holiday dates are the well-established ones
+// (public holiday + KRX's usual year-end closure) — edge cases like a
+// substitute-holiday ruling can still shift, so the calendar page disclaims
+// "정확한 일정은 한국거래소 공지를 확인하세요".
+const MACRO_EVENTS_2026 = [
+  { date: '2026-01-15', type: 'RATE_KR', title: '한국은행 금통위 기준금리 결정' },
+  { date: '2026-01-01', type: 'HOLIDAY', title: '신정 (증시 휴장)' },
+  { date: '2026-01-28', type: 'RATE_US', title: 'FOMC 결과 발표' },
+  { date: '2026-02-16', type: 'HOLIDAY', title: '설날 연휴 (증시 휴장)' },
+  { date: '2026-02-17', type: 'HOLIDAY', title: '설날 (증시 휴장)' },
+  { date: '2026-02-18', type: 'HOLIDAY', title: '설날 연휴 (증시 휴장)' },
+  { date: '2026-02-26', type: 'RATE_KR', title: '한국은행 금통위 기준금리 결정' },
+  { date: '2026-03-02', type: 'HOLIDAY', title: '삼일절 대체공휴일 (증시 휴장)' },
+  { date: '2026-03-18', type: 'RATE_US', title: 'FOMC 결과 발표' },
+  { date: '2026-04-10', type: 'RATE_KR', title: '한국은행 금통위 기준금리 결정' },
+  { date: '2026-04-29', type: 'RATE_US', title: 'FOMC 결과 발표' },
+  { date: '2026-05-05', type: 'HOLIDAY', title: '어린이날 (증시 휴장)' },
+  { date: '2026-05-25', type: 'HOLIDAY', title: '부처님오신날 대체공휴일 (증시 휴장, 변동 가능)' },
+  { date: '2026-05-28', type: 'RATE_KR', title: '한국은행 금통위 기준금리 결정' },
+  { date: '2026-06-17', type: 'RATE_US', title: 'FOMC 결과 발표' },
+  { date: '2026-07-16', type: 'RATE_KR', title: '한국은행 금통위 기준금리 결정' },
+  { date: '2026-07-29', type: 'RATE_US', title: 'FOMC 결과 발표' },
+  { date: '2026-08-17', type: 'HOLIDAY', title: '광복절 대체공휴일 (증시 휴장)' },
+  { date: '2026-08-27', type: 'RATE_KR', title: '한국은행 금통위 기준금리 결정' },
+  { date: '2026-09-16', type: 'RATE_US', title: 'FOMC 결과 발표' },
+  { date: '2026-09-24', type: 'HOLIDAY', title: '추석 연휴 (증시 휴장)' },
+  { date: '2026-09-25', type: 'HOLIDAY', title: '추석 (증시 휴장)' },
+  { date: '2026-09-26', type: 'HOLIDAY', title: '추석 연휴 (증시 휴장)' },
+  { date: '2026-10-05', type: 'HOLIDAY', title: '개천절 대체공휴일 (증시 휴장)' },
+  { date: '2026-10-09', type: 'HOLIDAY', title: '한글날 (증시 휴장)' },
+  { date: '2026-10-22', type: 'RATE_KR', title: '한국은행 금통위 기준금리 결정' },
+  { date: '2026-10-28', type: 'RATE_US', title: 'FOMC 결과 발표' },
+  { date: '2026-11-26', type: 'RATE_KR', title: '한국은행 금통위 기준금리 결정' },
+  { date: '2026-12-09', type: 'RATE_US', title: 'FOMC 결과 발표' },
+  { date: '2026-12-25', type: 'HOLIDAY', title: '성탄절 (증시 휴장)' },
+  { date: '2026-12-31', type: 'HOLIDAY', title: '연말 휴장일' },
+];
+
+// Naver renders IPO dates as "26.08.18" or a range "26.07.30~07.31".
+function parseNaverShortDate(str) {
+  const m = str && str.match(/(\d{2})\.(\d{2})\.(\d{2})/);
+  return m ? `20${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
+async function fetchIpoSchedule() {
+  const upstream = await fetchWithRetry('https://finance.naver.com/sise/ipo.naver', {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+  });
+
+  const buffer = Buffer.from(await upstream.arrayBuffer());
+  const html = iconv.decode(buffer, 'euc-kr');
+  const $ = cheerio.load(html);
+
+  const events = [];
+  $('.item_area').each((_, el) => {
+    const row = $(el);
+    const nameLink = row.find('.item_name a').first();
+    const name = nameLink.text().trim();
+    const market = row.find('.item_name .type').first().text().trim();
+    const link = nameLink.attr('href');
+    if (!name) return;
+
+    const fields = {};
+    row.find('.lst_info > li').each((__, li) => {
+      const li$ = $(li);
+      const label = li$.find('.tit').first().text().trim();
+      const value = li$
+        .clone()
+        .find('.tit')
+        .remove()
+        .end()
+        .text()
+        .replace(/\s+/g, ' ')
+        .trim();
+      fields[label] = value;
+    });
+
+    const price = fields['공모가'] ? `공모가 ${fields['공모가']}원` : null;
+    const detail = [market, price].filter(Boolean).join(' · ');
+
+    const subscribeStart = parseNaverShortDate(fields['개인청약']);
+    if (subscribeStart) {
+      events.push({ date: subscribeStart, type: 'IPO_SUBSCRIBE', title: `${name} 공모청약 시작`, detail, link });
+    }
+
+    const listingDate = parseNaverShortDate(fields['상장일']);
+    if (listingDate) {
+      events.push({ date: listingDate, type: 'IPO_LIST', title: `${name} 상장`, detail, link });
+    }
+  });
+
+  return events;
+}
+
+// Combines the fixed macro calendar with live-scraped IPO dates, filtered to
+// today and forward so the calendar page only shows what's still upcoming.
+app.get('/api/calendar', async (req, res) => {
+  try {
+    const ipoEvents = await fetchIpoSchedule();
+    const today = todayKstDateString();
+
+    const events = [...MACRO_EVENTS_2026, ...ipoEvents]
+      .filter((e) => e.date >= today)
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+    res.json({ events, updatedAt: new Date().toISOString() });
+  } catch (err) {
+    console.error('Failed to build calendar:', err.message);
+    // IPO scraping failed, but the fixed macro calendar is still useful.
+    const today = todayKstDateString();
+    const events = MACRO_EVENTS_2026.filter((e) => e.date >= today);
+    res.json({ events, updatedAt: new Date().toISOString(), partial: true });
+  }
+});
+
+// Scrapes Naver Finance's "시황정보" (market commentary) research report board.
+async function fetchMarketReports(limit = 20) {
+  const upstream = await fetchWithRetry('https://finance.naver.com/research/market_info_list.naver', {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+  });
+
+  const buffer = Buffer.from(await upstream.arrayBuffer());
+  const html = iconv.decode(buffer, 'euc-kr');
+  const $ = cheerio.load(html);
+
+  const reports = [];
+  $('table.type_1 tr').each((_, el) => {
+    const row = $(el);
+    const titleLink = row.find('td').eq(0).find('a').first();
+    const title = titleLink.text().trim();
+    if (!title) return;
+
+    const href = titleLink.attr('href');
+    const firm = row.find('td').eq(1).text().trim();
+    const pdfLink = row.find('td.file a').first().attr('href') || null;
+    const date = row.find('td.date').first().text().trim();
+
+    reports.push({
+      title,
+      firm,
+      date,
+      link: href ? `https://finance.naver.com/research/${href}` : null,
+      pdfLink,
+    });
+  });
+
+  return reports.slice(0, limit);
+}
+
+app.get('/api/reports', async (req, res) => {
+  try {
+    const reports = await fetchMarketReports(20);
+    res.json({ reports, updatedAt: new Date().toISOString() });
+  } catch (err) {
+    console.error('Failed to fetch market reports:', err.message);
+    res.status(502).json({ error: 'Failed to fetch market reports' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
