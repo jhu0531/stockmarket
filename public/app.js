@@ -522,10 +522,19 @@ refreshBtn.addEventListener('click', () => {
   loadLeadingIndicators();
 });
 
-loadIndices();
-loadNyNews();
-loadKrNews();
-loadLeadingIndicators();
+// Keep the rain-dance loading screen up for at least a moment (so it doesn't
+// just flash on a fast connection) and until the first real data has landed.
+function hideLoadingOverlay() {
+  const overlay = document.getElementById('loading-overlay');
+  if (!overlay) return;
+  overlay.classList.add('hidden');
+  setTimeout(() => overlay.remove(), 600);
+}
+
+const initialLoad = Promise.all([loadIndices(), loadNyNews(), loadKrNews(), loadLeadingIndicators()]);
+const minDisplayTime = new Promise((resolve) => setTimeout(resolve, 1500));
+Promise.all([initialLoad, minDisplayTime]).finally(hideLoadingOverlay);
+
 setInterval(loadIndices, REFRESH_INTERVAL_MS);
 setInterval(loadNyNews, REFRESH_INTERVAL_MS * 4);
 setInterval(loadKrNews, REFRESH_INTERVAL_MS * 4);

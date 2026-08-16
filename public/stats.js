@@ -95,4 +95,12 @@ async function loadStats() {
   }
 }
 
-loadStats();
+function hideLoadingOverlay() {
+  const overlay = document.getElementById('loading-overlay');
+  if (!overlay) return;
+  overlay.classList.add('hidden');
+  setTimeout(() => overlay.remove(), 600);
+}
+
+const minDisplayTime = new Promise((resolve) => setTimeout(resolve, 1500));
+Promise.all([loadStats(), minDisplayTime]).finally(hideLoadingOverlay);
