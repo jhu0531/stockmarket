@@ -11,6 +11,12 @@
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#14161a" />
   <link rel="stylesheet" href="style.css" />
+  <script>
+    (function () {
+      var saved = localStorage.getItem('theme');
+      if (saved === 'light' || saved === 'dark') document.documentElement.setAttribute('data-theme', saved);
+    })();
+  </script>
 </head>
 <body>
   <div id="loading-overlay">
@@ -27,7 +33,10 @@
 
   <div class="app-shell">
     <nav class="sidebar">
-      <div class="sidebar-brand">🪶 주린이 기우제</div>
+      <div class="sidebar-brand">
+        <span>🪶 주린이 기우제</span>
+        <button type="button" class="theme-toggle-btn theme-toggle-btn-circle" aria-label="테마 전환"><span class="theme-toggle-icon">🌙</span></button>
+      </div>
       <button type="button" id="mobile-menu-btn" class="sidebar-link mobile-menu-btn"><span class="sidebar-icon">☰</span><span>메뉴</span></button>
       <a href="/" class="sidebar-link"><span class="sidebar-icon">🏠</span><span>홈</span></a>
       <a href="/news.html" class="sidebar-link"><span class="sidebar-icon">📰</span><span>경제뉴스</span></a>
@@ -39,6 +48,7 @@
       <div class="mobile-menu-drawer" id="mobile-menu-drawer" hidden>
         <a href="/watchlist.html" class="mobile-menu-drawer-link"><span class="sidebar-icon">⭐</span><span>관심종목</span></a>
         <a href="/valuation.html" class="mobile-menu-drawer-link"><span class="sidebar-icon">🧮</span><span>적정주가</span></a>
+        <button type="button" class="mobile-menu-drawer-link theme-toggle-btn"><span class="theme-toggle-icon sidebar-icon">🌙</span><span>다크모드 전환</span></button>
       </div>
     </nav>
 
@@ -79,5 +89,6 @@
 
   <script src="reports.js"></script>
   <script src="sidebar-menu.js"></script>
+  <script src="theme-toggle.js"></script>
 </body>
 </html>

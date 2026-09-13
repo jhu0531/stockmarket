@@ -11,7 +11,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #14161a;
     --card-bg: #1f2227;
     --text: #f1f2f4;
@@ -22,6 +22,19 @@
     --flat: #9aa0a6;
     --accent: #f1f2f4;
   }
+}
+
+/* Explicit toggle wins over prefers-color-scheme in both directions. */
+:root[data-theme="dark"] {
+  --bg: #14161a;
+  --card-bg: #1f2227;
+  --text: #f1f2f4;
+  --muted: #9aa0a6;
+  --border: #33373e;
+  --up: #ff5c5c;
+  --down: #5b9dff;
+  --flat: #9aa0a6;
+  --accent: #f1f2f4;
 }
 
 * {
@@ -695,10 +708,33 @@ main {
 }
 
 .sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   font-weight: 800;
   font-size: 1.05rem;
   padding: 0 0.6rem 1.25rem;
   white-space: nowrap;
+}
+
+.theme-toggle-btn-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card-bg);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.theme-toggle-btn-circle:hover {
+  background: var(--border);
 }
 
 .sidebar-link {
