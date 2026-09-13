@@ -31,6 +31,7 @@
     <nav class="sidebar">
       <div class="sidebar-brand">🪶 주린이 기우제</div>
       <a href="/" class="sidebar-link active"><span class="sidebar-icon">🏠</span><span>홈</span></a>
+      <a href="/news.html" class="sidebar-link"><span class="sidebar-icon">📰</span><span>경제뉴스</span></a>
       <a href="/calendar.html" class="sidebar-link"><span class="sidebar-icon">📅</span><span>증시캘린더</span></a>
       <a href="/reports.html" class="sidebar-link"><span class="sidebar-icon">📄</span><span>증시리포트</span></a>
     </nav>
@@ -48,37 +49,6 @@
       </header>
 
       <main class="container">
-    <section class="news-section" id="ny-news-section">
-      <div class="section-header">
-        <h2 class="section-title">해외뉴스</h2>
-        <button id="news-section-toggle" class="section-toggle" type="button" aria-expanded="false" aria-controls="ny-news-list">
-          펼치기
-        </button>
-      </div>
-      <ul class="news-list" id="ny-news-list" hidden>
-        <li class="news-item news-loading">불러오는 중...</li>
-      </ul>
-    </section>
-
-    <section class="news-section" id="kr-news-section">
-      <div class="section-header">
-        <h2 class="section-title">국내뉴스</h2>
-        <button id="kr-news-section-toggle" class="section-toggle" type="button" aria-expanded="false" aria-controls="kr-news-body">
-          펼치기
-        </button>
-      </div>
-      <div id="kr-news-body" hidden>
-        <h3 class="news-subheading">거시경제</h3>
-        <ul class="news-list" id="kr-news-macro-list">
-          <li class="news-item news-loading">불러오는 중...</li>
-        </ul>
-        <h3 class="news-subheading">미시경제</h3>
-        <ul class="news-list" id="kr-news-micro-list">
-          <li class="news-item news-loading">불러오는 중...</li>
-        </ul>
-      </div>
-    </section>
-
     <div class="status-bar">
       <span id="updated-at">불러오는 중...</span>
       <button id="refresh-btn" type="button">새로고침</button>
