@@ -7,6 +7,7 @@ const cheerio = require('cheerio');
 const iconv = require('iconv-lite');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -94,11 +95,13 @@ function scoreKoreanSentiment(texts) {
   return { score, direction: directionOf(score) };
 }
 
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Firestore stores the daily signal-vs-KOSPI history for the 통계 tab. Falls
 // back to disabled (rather than crashing) when credentials aren't set.
 let db = null;
+let auth = null;
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
   const firebaseApp = initializeApp({
     credential: cert({
@@ -108,8 +111,27 @@ if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && proc
     }),
   });
   db = getFirestore(firebaseApp);
+  auth = getAuth(firebaseApp);
 } else {
   console.warn('Firebase credentials not set; /api/stats will be unavailable.');
+}
+
+// Verifies the Firebase ID token on the Authorization header (issued by the
+// client-side Google sign-in) and attaches the caller's uid to req.
+async function requireAuth(req, res, next) {
+  if (!auth) return res.status(503).json({ error: 'Login not configured' });
+
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Missing token' });
+
+  try {
+    const decoded = await auth.verifyIdToken(token);
+    req.uid = decoded.uid;
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
 }
 
 const RETRY_ATTEMPTS = 3;
@@ -1217,6 +1239,149 @@ app.get('/api/reports', async (req, res) => {
   } catch (err) {
     console.error('Failed to fetch research reports:', err.message);
     res.status(502).json({ error: 'Failed to fetch research reports' });
+  }
+});
+
+// ── 관심종목 / 적정주가 ──
+
+// Naver's stock-search autocomplete; free, no key.
+async function fetchStockSearch(query) {
+  const upstream = await fetchWithRetry(
+    `https://ac.stock.naver.com/ac?q=${encodeURIComponent(query)}&target=stock`,
+    { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' } }
+  );
+  const data = await upstream.json();
+
+  return (data.items || [])
+    .filter((item) => item.category === 'stock')
+    .map((item) => ({ code: item.code, name: item.name, market: item.typeName }));
+}
+
+// "김정환 적정주가 만능공식" (교재 확인): 적정주가 = (BPS×ROE)/r = EPS×12, r=1/12
+// 가정. EPS를 API가 직접 주므로 그 값을 그대로 12배 한다. 컨센서스(추정)
+// 연도가 아니라 가장 최근 확정 실적 연도를 사용한다.
+function computeFairValue(financeInfo) {
+  const confirmedPeriod = [...financeInfo.trTitleList].reverse().find((t) => t.isConsensus !== 'Y');
+  if (!confirmedPeriod) return null;
+
+  const readValue = (title) => {
+    const row = financeInfo.rowList.find((r) => r.title === title);
+    const raw = row && row.columns[confirmedPeriod.key] && row.columns[confirmedPeriod.key].value;
+    if (!raw) return null;
+    const num = Number(String(raw).replace(/,/g, ''));
+    return Number.isNaN(num) ? null : num;
+  };
+
+  const eps = readValue('EPS');
+  if (!eps || eps <= 0) return null;
+
+  return {
+    period: confirmedPeriod.title,
+    eps,
+    bps: readValue('BPS'),
+    roe: readValue('ROE'),
+    fairValue: Math.round(eps * 12),
+  };
+}
+
+async function fetchStockValuation(code) {
+  const [priceData, financeData] = await Promise.all([
+    fetchWithRetry(`https://polling.finance.naver.com/api/realtime/domestic/stock/${code}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://finance.naver.com/' },
+    }).then((r) => r.json()),
+    fetchWithRetry(`https://m.stock.naver.com/api/stock/${code}/finance/annual`, {
+      headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
+    }).then((r) => r.json()),
+  ]);
+
+  const priceItem = priceData.datas && priceData.datas[0];
+  const fairValue = financeData.financeInfo ? computeFairValue(financeData.financeInfo) : null;
+  const currentPrice = priceItem ? Number(priceItem.closePriceRaw) : null;
+
+  let gapRatio = null;
+  let verdict = null;
+  if (fairValue && currentPrice) {
+    gapRatio = ((fairValue.fairValue - currentPrice) / currentPrice) * 100;
+    verdict = gapRatio > 0 ? 'UNDERVALUED' : gapRatio < 0 ? 'OVERVALUED' : 'FAIR';
+  }
+
+  return {
+    code,
+    name: priceItem ? priceItem.stockName : null,
+    currentPrice,
+    change: priceItem ? priceItem.compareToPreviousClosePrice : null,
+    changeRatio: priceItem ? priceItem.fluctuationsRatio : null,
+    direction: priceItem ? priceItem.compareToPreviousPrice.name : null,
+    fairValue,
+    gapRatio,
+    verdict,
+  };
+}
+
+app.get('/api/stock-search', async (req, res) => {
+  const query = (req.query.q || '').trim();
+  if (!query) return res.json({ results: [] });
+
+  try {
+    res.json({ results: await fetchStockSearch(query) });
+  } catch (err) {
+    console.error('Failed to search stocks:', err.message);
+    res.status(502).json({ error: 'Failed to search stocks' });
+  }
+});
+
+app.get('/api/watchlist', requireAuth, async (req, res) => {
+  try {
+    const snapshot = await db
+      .collection('users')
+      .doc(req.uid)
+      .collection('watchlist')
+      .orderBy('addedAt', 'asc')
+      .get();
+
+    const items = await Promise.all(
+      snapshot.docs.map(async (doc) => {
+        const { code, name } = doc.data();
+        try {
+          return await fetchStockValuation(code);
+        } catch (err) {
+          console.error(`Failed to value ${code}:`, err.message);
+          return { code, name, error: true };
+        }
+      })
+    );
+
+    res.json({ items });
+  } catch (err) {
+    console.error('Failed to fetch watchlist:', err.message);
+    res.status(502).json({ error: 'Failed to fetch watchlist' });
+  }
+});
+
+app.post('/api/watchlist', requireAuth, async (req, res) => {
+  const { code, name } = req.body || {};
+  if (!code || !name) return res.status(400).json({ error: 'code and name are required' });
+
+  try {
+    await db.collection('users').doc(req.uid).collection('watchlist').doc(code).set({
+      code,
+      name,
+      addedAt: FieldValue.serverTimestamp(),
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Failed to add to watchlist:', err.message);
+    res.status(502).json({ error: 'Failed to add to watchlist' });
+  }
+});
+
+app.delete('/api/watchlist/:code', requireAuth, async (req, res) => {
+  try {
+    await db.collection('users').doc(req.uid).collection('watchlist').doc(req.params.code).delete();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Failed to remove from watchlist:', err.message);
+    res.status(502).json({ error: 'Failed to remove from watchlist' });
   }
 });
 

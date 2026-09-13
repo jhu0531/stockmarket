@@ -1121,3 +1121,202 @@ main {
 .report-pdf:hover {
   background: var(--border);
 }
+
+/* ── 관심종목 / 적정주가 (로그인) ── */
+
+.auth-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.auth-btn {
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+  font-weight: 600;
+}
+
+.auth-btn:hover {
+  background: var(--border);
+}
+
+.stock-search {
+  position: relative;
+  margin-bottom: 1.25rem;
+}
+
+#stock-search-input {
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.search-results {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.search-results li {
+  padding: 0.55rem 0.6rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.search-results li:hover {
+  background: var(--border);
+}
+
+.watchlist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.watchlist-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+}
+
+.watchlist-name {
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.watchlist-price {
+  flex: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--flat);
+}
+
+.watchlist-item.up .watchlist-price {
+  color: var(--up);
+}
+
+.watchlist-item.down .watchlist-price {
+  color: var(--down);
+}
+
+.watchlist-remove {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-family: inherit;
+}
+
+.watchlist-remove:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.valuation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.valuation-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+}
+
+.valuation-name {
+  margin: 0 0 0.6rem;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.valuation-row {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.valuation-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.valuation-value {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.valuation-badge {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.valuation-badge.up {
+  color: var(--up);
+}
+
+.valuation-badge.down {
+  color: var(--down);
+}
+
+.valuation-badge.flat {
+  color: var(--flat);
+}
+
+.valuation-meta {
+  margin: 0.6rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.valuation-empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}

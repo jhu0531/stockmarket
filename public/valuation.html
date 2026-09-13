@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>경제뉴스 | 주린이 기우제</title>
+  <title>적정주가 | 주린이 기우제</title>
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" href="/icons/favicon-32.png" sizes="32x32" />
   <link rel="icon" type="image/png" href="/icons/favicon-16.png" sizes="16x16" />
@@ -29,63 +29,54 @@
     <nav class="sidebar">
       <div class="sidebar-brand">🪶 주린이 기우제</div>
       <a href="/" class="sidebar-link"><span class="sidebar-icon">🏠</span><span>홈</span></a>
-      <a href="/news.html" class="sidebar-link active"><span class="sidebar-icon">📰</span><span>경제뉴스</span></a>
+      <a href="/news.html" class="sidebar-link"><span class="sidebar-icon">📰</span><span>경제뉴스</span></a>
       <a href="/calendar.html" class="sidebar-link"><span class="sidebar-icon">📅</span><span>증시캘린더</span></a>
       <a href="/reports.html" class="sidebar-link"><span class="sidebar-icon">📄</span><span>증시리포트</span></a>
       <a href="/compass.html" class="sidebar-link"><span class="sidebar-icon">🧭</span><span>증시나침반</span></a>
       <a href="/watchlist.html" class="sidebar-link"><span class="sidebar-icon">⭐</span><span>관심종목</span></a>
-      <a href="/valuation.html" class="sidebar-link"><span class="sidebar-icon">🧮</span><span>적정주가</span></a>
+      <a href="/valuation.html" class="sidebar-link active"><span class="sidebar-icon">🧮</span><span>적정주가</span></a>
     </nav>
 
     <div class="app-content">
       <header class="site-header">
         <div class="container">
-          <h1>경제뉴스</h1>
-          <p class="subtitle">해외뉴스 · 국내뉴스</p>
+          <h1>적정주가</h1>
+          <p class="subtitle">관심종목 적정주가 확인</p>
         </div>
       </header>
 
       <main class="container">
-        <section class="news-section" id="ny-news-section">
-          <div class="section-header">
-            <h2 class="section-title">해외뉴스</h2>
-            <button id="news-section-toggle" class="section-toggle" type="button" aria-expanded="true" aria-controls="ny-news-list">
-              접기
-            </button>
-          </div>
-          <ul class="news-list" id="ny-news-list">
-            <li class="news-item news-loading">불러오는 중...</li>
-          </ul>
+        <div class="auth-bar">
+          <span id="auth-status">로그인 확인 중...</span>
+          <button id="login-btn" type="button" class="auth-btn" hidden>구글로 로그인</button>
+          <button id="logout-btn" type="button" class="auth-btn" hidden>로그아웃</button>
+        </div>
+
+        <section id="valuation-login-required">
+          <p class="calendar-empty">적정주가를 확인하려면 로그인해주세요.</p>
         </section>
 
-        <section class="news-section" id="kr-news-section">
-          <div class="section-header">
-            <h2 class="section-title">국내뉴스</h2>
-            <button id="kr-news-section-toggle" class="section-toggle" type="button" aria-expanded="true" aria-controls="kr-news-body">
-              접기
-            </button>
-          </div>
-          <div id="kr-news-body">
-            <h3 class="news-subheading">거시경제</h3>
-            <ul class="news-list" id="kr-news-macro-list">
-              <li class="news-item news-loading">불러오는 중...</li>
-            </ul>
-            <h3 class="news-subheading">미시경제</h3>
-            <ul class="news-list" id="kr-news-micro-list">
-              <li class="news-item news-loading">불러오는 중...</li>
-            </ul>
-          </div>
+        <section id="valuation-content" hidden>
+          <ul class="valuation-list" id="valuation-list">
+            <li class="calendar-empty">불러오는 중...</li>
+          </ul>
+
+          <p class="sentiment-disclaimer">
+            적정주가 = EPS × 12 (BPS×ROE/r, r=1/12 가정) 로 계산한 참고용 수치이며, 성장성·배당·업종
+            특성을 반영하지 않는 단순화된 공식입니다. 투자 자문이 아니며 투자 판단과 책임은 본인에게
+            있습니다. 관심종목 추가/삭제는 <a href="/watchlist.html">관심종목</a> 페이지에서 할 수 있습니다.
+          </p>
         </section>
       </main>
 
       <footer class="site-footer">
         <div class="container">
-          <p>데이터 제공: 네이버 금융 · 자동 갱신 2분</p>
+          <p>데이터 제공: 네이버 금융</p>
         </div>
       </footer>
     </div>
   </div>
 
-  <script src="news.js"></script>
+  <script type="module" src="valuation.js"></script>
 </body>
 </html>
