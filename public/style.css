@@ -734,6 +734,17 @@ main {
   flex-direction: column;
 }
 
+.mobile-menu-btn {
+  display: none;
+  border: none;
+  background: none;
+  font-family: inherit;
+}
+
+.mobile-menu-drawer {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .app-shell {
     flex-direction: column;
@@ -768,6 +779,50 @@ main {
     flex: 1;
     text-align: center;
     border-radius: 8px;
+  }
+
+  .mobile-menu-btn {
+    display: flex;
+  }
+
+  .desktop-only-link {
+    display: none;
+  }
+
+  .mobile-menu-drawer {
+    position: fixed;
+    bottom: calc(4.25rem + env(safe-area-inset-bottom));
+    left: 0.75rem;
+    right: 0.75rem;
+    z-index: 500;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.4rem;
+    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.18);
+  }
+
+  .mobile-menu-drawer:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .mobile-menu-drawer-link {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.65rem 0.75rem;
+    border-radius: 8px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .mobile-menu-drawer-link:hover,
+  .mobile-menu-drawer-link:active {
+    background: var(--border);
   }
 
   .app-content {
@@ -1267,6 +1322,23 @@ main {
   margin: 0 0 0.6rem;
   font-weight: 700;
   font-size: 1rem;
+}
+
+.valuation-current {
+  margin: 0 0 0.75rem;
+}
+
+.valuation-block {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+}
+
+.valuation-block-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
 }
 
 .valuation-row {

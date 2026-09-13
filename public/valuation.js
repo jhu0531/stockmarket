@@ -84,38 +84,52 @@ function renderValuations(items) {
       return;
     }
 
-    const row = document.createElement('div');
-    row.className = 'valuation-row';
-
-    const current = document.createElement('div');
+    const current = document.createElement('p');
+    current.className = 'valuation-current';
     current.innerHTML = `<span class="valuation-label">현재가</span><span class="valuation-value">${
       item.currentPrice !== null ? item.currentPrice.toLocaleString() + '원' : '-'
     }</span>`;
+    li.appendChild(current);
 
-    const fair = document.createElement('div');
-    fair.innerHTML = `<span class="valuation-label">적정주가</span><span class="valuation-value">${item.fairValue.fairValue.toLocaleString()}원</span>`;
-
-    row.appendChild(current);
-    row.appendChild(fair);
-    li.appendChild(row);
-
-    if (item.verdict) {
-      const badge = document.createElement('span');
-      badge.className = `valuation-badge ${VERDICT_CLASS[item.verdict]}`;
-      const sign = item.gapRatio > 0 ? '+' : '';
-      badge.textContent = `${VERDICT_LABEL[item.verdict]} (${sign}${item.gapRatio.toFixed(1)}%)`;
-      li.appendChild(badge);
+    li.appendChild(renderFairValueBlock('확정 실적 기준', item.fairValue.confirmed));
+    if (item.fairValue.consensus) {
+      li.appendChild(renderFairValueBlock('컨센서스(추정) 기준', item.fairValue.consensus));
     }
-
-    const meta = document.createElement('p');
-    meta.className = 'valuation-meta';
-    meta.textContent = `${item.fairValue.period} 기준 · EPS ${item.fairValue.eps.toLocaleString()}원${
-      item.fairValue.roe !== null ? ` · ROE ${item.fairValue.roe}%` : ''
-    }${item.fairValue.bps !== null ? ` · BPS ${item.fairValue.bps.toLocaleString()}원` : ''}`;
-    li.appendChild(meta);
 
     listEl.appendChild(li);
   });
+}
+
+function renderFairValueBlock(title, fv) {
+  const block = document.createElement('div');
+  block.className = 'valuation-block';
+
+  const heading = document.createElement('p');
+  heading.className = 'valuation-block-title';
+  heading.textContent = title;
+  block.appendChild(heading);
+
+  const row = document.createElement('div');
+  row.className = 'valuation-row';
+  row.innerHTML = `<span class="valuation-label">적정주가</span><span class="valuation-value">${fv.fairValue.toLocaleString()}원</span>`;
+  block.appendChild(row);
+
+  if (fv.verdict) {
+    const badge = document.createElement('span');
+    badge.className = `valuation-badge ${VERDICT_CLASS[fv.verdict]}`;
+    const sign = fv.gapRatio > 0 ? '+' : '';
+    badge.textContent = `${VERDICT_LABEL[fv.verdict]} (${sign}${fv.gapRatio.toFixed(1)}%)`;
+    block.appendChild(badge);
+  }
+
+  const meta = document.createElement('p');
+  meta.className = 'valuation-meta';
+  meta.textContent = `${fv.period} 기준 · EPS ${fv.eps.toLocaleString()}원${
+    fv.roe !== null ? ` · ROE ${fv.roe}%` : ''
+  }${fv.bps !== null ? ` · BPS ${fv.bps.toLocaleString()}원` : ''}`;
+  block.appendChild(meta);
+
+  return block;
 }
 
 const minDisplayTime = new Promise((resolve) => setTimeout(resolve, 1500));

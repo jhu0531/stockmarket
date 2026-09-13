@@ -1260,13 +1260,13 @@ async function fetchStockSearch(query) {
 // "김정환 적정주가 만능공식" (교재 확인): 적정주가 = (BPS×ROE)/r = EPS×12, r=1/12
 // 가정. EPS를 API가 직접 주므로 그 값을 그대로 12배 한다. 컨센서스(추정)
 // 연도가 아니라 가장 최근 확정 실적 연도를 사용한다.
-function computeFairValue(financeInfo) {
-  const confirmedPeriod = [...financeInfo.trTitleList].reverse().find((t) => t.isConsensus !== 'Y');
-  if (!confirmedPeriod) return null;
-
+// 확정(최근 발표) 실적과, 있으면 컨센서스(애널리스트 추정) 실적 둘 다 계산해서
+// 반환한다. 반도체처럼 이익이 빠르게 바뀌는 종목은 두 값의 차이가 커서,
+// 어느 연도 실적을 쓰느냐에 따라 저평가/고평가 판정이 뒤집힐 수 있다.
+function computeFairValueForPeriod(financeInfo, period) {
   const readValue = (title) => {
     const row = financeInfo.rowList.find((r) => r.title === title);
-    const raw = row && row.columns[confirmedPeriod.key] && row.columns[confirmedPeriod.key].value;
+    const raw = row && row.columns[period.key] && row.columns[period.key].value;
     if (!raw) return null;
     const num = Number(String(raw).replace(/,/g, ''));
     return Number.isNaN(num) ? null : num;
@@ -1276,12 +1276,24 @@ function computeFairValue(financeInfo) {
   if (!eps || eps <= 0) return null;
 
   return {
-    period: confirmedPeriod.title,
+    period: period.title,
     eps,
     bps: readValue('BPS'),
     roe: readValue('ROE'),
     fairValue: Math.round(eps * 12),
   };
+}
+
+function computeFairValue(financeInfo) {
+  const periods = financeInfo.trTitleList;
+  const confirmedPeriod = [...periods].reverse().find((t) => t.isConsensus !== 'Y');
+  const consensusPeriod = [...periods].reverse().find((t) => t.isConsensus === 'Y');
+
+  const confirmed = confirmedPeriod ? computeFairValueForPeriod(financeInfo, confirmedPeriod) : null;
+  const consensus = consensusPeriod ? computeFairValueForPeriod(financeInfo, consensusPeriod) : null;
+  if (!confirmed) return null;
+
+  return { confirmed, consensus };
 }
 
 async function fetchStockValuation(code) {
@@ -1298,12 +1310,12 @@ async function fetchStockValuation(code) {
   const fairValue = financeData.financeInfo ? computeFairValue(financeData.financeInfo) : null;
   const currentPrice = priceItem ? Number(priceItem.closePriceRaw) : null;
 
-  let gapRatio = null;
-  let verdict = null;
-  if (fairValue && currentPrice) {
-    gapRatio = ((fairValue.fairValue - currentPrice) / currentPrice) * 100;
-    verdict = gapRatio > 0 ? 'UNDERVALUED' : gapRatio < 0 ? 'OVERVALUED' : 'FAIR';
-  }
+  const withVerdict = (fv) => {
+    if (!fv || !currentPrice) return fv ? { ...fv, gapRatio: null, verdict: null } : null;
+    const gapRatio = ((fv.fairValue - currentPrice) / currentPrice) * 100;
+    const verdict = gapRatio > 0 ? 'UNDERVALUED' : gapRatio < 0 ? 'OVERVALUED' : 'FAIR';
+    return { ...fv, gapRatio, verdict };
+  };
 
   return {
     code,
@@ -1312,9 +1324,9 @@ async function fetchStockValuation(code) {
     change: priceItem ? priceItem.compareToPreviousClosePrice : null,
     changeRatio: priceItem ? priceItem.fluctuationsRatio : null,
     direction: priceItem ? priceItem.compareToPreviousPrice.name : null,
-    fairValue,
-    gapRatio,
-    verdict,
+    fairValue: fairValue
+      ? { confirmed: withVerdict(fairValue.confirmed), consensus: withVerdict(fairValue.consensus) }
+      : null,
   };
 }
 
