@@ -773,6 +773,12 @@ main {
   .app-content {
     padding-bottom: 4.25rem;
   }
+
+  .stats-table th,
+  .stats-table td {
+    padding: 0.5rem 0.4rem;
+    font-size: 0.78rem;
+  }
 }
 
 /* ── 증시캘린더 ── */
