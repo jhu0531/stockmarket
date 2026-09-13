@@ -1186,52 +1186,37 @@ app.get('/api/calendar', async (req, res) => {
   res.json({ events, updatedAt: new Date().toISOString() });
 });
 
-// Scrapes Naver Finance's "종목분석" (individual-stock analysis) research
-// report board. Unlike the market-commentary board, each row leads with a
-// 종목명 (stock name) column before the title.
-async function fetchCompanyReports(limit = 20) {
-  const upstream = await fetchWithRetry('https://finance.naver.com/research/company_list.naver', {
-    headers: { 'User-Agent': 'Mozilla/5.0' },
+// Naver migrated finance.naver.com/research/* to client-rendered pages with
+// no server-side HTML table, so this calls the same mobile-app JSON API
+// those pages themselves fetch from (free, no key) instead of scraping HTML.
+// "company" is 종목분석 (stock name per row); "industry" is 산업분석 (sector
+// name per row instead of a stock).
+async function fetchNaverResearch(category, limit = 20) {
+  const upstream = await fetchWithRetry(`https://m.stock.naver.com/api/research/${category}`, {
+    headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
   });
 
-  const buffer = Buffer.from(await upstream.arrayBuffer());
-  const html = iconv.decode(buffer, 'euc-kr');
-  const $ = cheerio.load(html);
+  const items = await upstream.json();
 
-  const reports = [];
-  $('table.type_1 tr').each((_, el) => {
-    const row = $(el);
-    const cells = row.find('td');
-    const titleLink = cells.eq(1).find('a').first();
-    const title = titleLink.text().trim();
-    if (!title) return;
-
-    const stockName = cells.eq(0).find('a').first().text().trim();
-    const href = titleLink.attr('href');
-    const firm = cells.eq(2).text().trim();
-    const pdfLink = row.find('td.file a').first().attr('href') || null;
-    const date = row.find('td.date').first().text().trim();
-
-    reports.push({
-      stockName,
-      title,
-      firm,
-      date,
-      link: href ? `https://finance.naver.com/research/${href}` : null,
-      pdfLink,
-    });
-  });
-
-  return reports.slice(0, limit);
+  return items.slice(0, limit).map((item) => ({
+    label: category === 'company' ? item.itemName : item.category,
+    title: item.title,
+    firm: item.brokerName,
+    date: item.writeDate,
+    link: item.endUrl || null,
+  }));
 }
 
 app.get('/api/reports', async (req, res) => {
   try {
-    const reports = await fetchCompanyReports(20);
-    res.json({ reports, updatedAt: new Date().toISOString() });
+    const [industry, company] = await Promise.all([
+      fetchNaverResearch('industry', 20),
+      fetchNaverResearch('company', 20),
+    ]);
+    res.json({ industry, company, updatedAt: new Date().toISOString() });
   } catch (err) {
-    console.error('Failed to fetch company analysis reports:', err.message);
-    res.status(502).json({ error: 'Failed to fetch company analysis reports' });
+    console.error('Failed to fetch research reports:', err.message);
+    res.status(502).json({ error: 'Failed to fetch research reports' });
   }
 });
 
