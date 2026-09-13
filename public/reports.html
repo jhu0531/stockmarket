@@ -44,15 +44,22 @@
       </header>
 
       <main class="container">
-        <h2 class="section-title">산업별동향</h2>
-        <ul class="report-list" id="industry-report-list">
-          <li class="calendar-empty">불러오는 중...</li>
-        </ul>
+        <select id="report-category-select" class="report-category-select">
+          <option value="industry">산업별동향</option>
+          <option value="company">종목별리포트</option>
+        </select>
 
-        <h2 class="section-title">종목별리포트</h2>
-        <ul class="report-list" id="company-report-list">
-          <li class="calendar-empty">불러오는 중...</li>
-        </ul>
+        <section id="industry-report-section">
+          <ul class="report-list" id="industry-report-list">
+            <li class="calendar-empty">불러오는 중...</li>
+          </ul>
+        </section>
+
+        <section id="company-report-section" hidden>
+          <ul class="report-list" id="company-report-list">
+            <li class="calendar-empty">불러오는 중...</li>
+          </ul>
+        </section>
       </main>
 
       <footer class="site-footer">

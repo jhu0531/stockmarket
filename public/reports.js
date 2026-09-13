@@ -1,5 +1,14 @@
 const industryListEl = document.getElementById('industry-report-list');
 const companyListEl = document.getElementById('company-report-list');
+const industrySectionEl = document.getElementById('industry-report-section');
+const companySectionEl = document.getElementById('company-report-section');
+const categorySelectEl = document.getElementById('report-category-select');
+
+categorySelectEl.addEventListener('change', () => {
+  const isIndustry = categorySelectEl.value === 'industry';
+  industrySectionEl.hidden = !isIndustry;
+  companySectionEl.hidden = isIndustry;
+});
 
 function formatReportDate(dateStr) {
   // "26.08.14" -> "2026.08.14"

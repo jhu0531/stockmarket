@@ -1046,6 +1046,20 @@ main {
 
 /* ── 증시리포트 ── */
 
+.report-category-select {
+  display: block;
+  margin: 1rem 0 0;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
 .report-list {
   list-style: none;
   margin: 1rem 0 2rem;
