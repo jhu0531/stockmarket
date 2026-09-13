@@ -437,6 +437,10 @@ function computeSignalScore(payload) {
     addSignal('코스닥 외국인 순매수', payload.investorFlow.kosdaq.foreign.direction);
     addSignal('코스닥 기관 순매수', payload.investorFlow.kosdaq.institution.direction);
   }
+  const oilEntries = payload.commodities.filter((c) => c.code === 'CRUDE' || c.code === 'BRENT');
+  if (oilEntries.length) {
+    addSignal('국제 유가 (WTI·브렌트)', averageDirection(oilEntries.map((c) => c.direction)), { invert: true });
+  }
   if (payload.bdi) addSignal('BDI (발틱운임지수)', payload.bdi.direction);
   if (payload.fundFlow && payload.fundFlow.deposits) addSignal('고객예탁금', payload.fundFlow.deposits.direction);
   if (payload.newsSentiment.domestic) addSignal('국내뉴스 심리', payload.newsSentiment.domestic.direction);
