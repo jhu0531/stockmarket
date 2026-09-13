@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>증시나침반 | 주린이 기우제</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png" sizes="32x32" />
+  <link rel="icon" type="image/png" href="/icons/favicon-16.png" sizes="16x16" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#14161a" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="loading-overlay">
+    <iframe id="loading-frame" title="로딩 중"></iframe>
+  </div>
+  <script>
+    if (sessionStorage.getItem('raindanceShown')) {
+      document.getElementById('loading-overlay').remove();
+    } else {
+      sessionStorage.setItem('raindanceShown', '1');
+      document.getElementById('loading-frame').src = 'loading.html';
+    }
+  </script>
+
+  <div class="app-shell">
+    <nav class="sidebar">
+      <div class="sidebar-brand">🪶 주린이 기우제</div>
+      <a href="/" class="sidebar-link"><span class="sidebar-icon">🏠</span><span>홈</span></a>
+      <a href="/news.html" class="sidebar-link"><span class="sidebar-icon">📰</span><span>경제뉴스</span></a>
+      <a href="/calendar.html" class="sidebar-link"><span class="sidebar-icon">📅</span><span>증시캘린더</span></a>
+      <a href="/reports.html" class="sidebar-link"><span class="sidebar-icon">📄</span><span>증시리포트</span></a>
+      <a href="/compass.html" class="sidebar-link active"><span class="sidebar-icon">🧭</span><span>증시나침반</span></a>
+    </nav>
+
+    <div class="app-content">
+      <header class="site-header">
+        <div class="container">
+          <h1>증시나침반</h1>
+          <p class="subtitle">국내 산업 12개 카테고리 강세/약세</p>
+        </div>
+      </header>
+
+      <main class="container">
+        <div class="status-bar">
+          <span id="compass-updated-at">불러오는 중...</span>
+        </div>
+
+        <div class="leading-grid" id="compass-grid">
+          <article class="mini-card loading" data-sector="STEEL_NONFERROUS">
+            <p class="mini-name">철강/비철금속</p>
+            <p class="mini-price">-</p>
+            <p class="mini-change"><span class="change-value">-</span></p>
+            <p class="mini-meta">-</p>
+          </article>
+          <article class="mini-card loading" data-sector="AUTO_MACHINERY">
+            <p class="mini-name">자동차/기계</p>
+            <p class="mini-price">-</p>
+            <p class="mini-change"><span class="change-value">-</span></p>
+            <p class="mini-meta">-</p>
+          </article>
+          <article class="mini-card loading" data-sector="IT_ELECTRONICS">
+            <p class="mini-name">정보기술/가전</p>
+            <p class="mini-price">-</p>
+            <p class="mini-change"><span class="change-value">-</span></p>
+            <p class="mini-meta">-</p>
+          </article>
+          <article class="mini-card loading" data-sector="ENERGY_MATERIALS">
+            <p class="mini-name">에너지와 소재</p>
+            <p class="mini-price">-</p>
+            <p class="mini-change"><span class="change-value">-</span></p>
+            <p class="mini-meta">-</p>
+          </article>
+          <article class="mini-card loading" data-sector="CONSTRUCTION">
+            <p class="mini-name">건설</p>
+            <p class="mini-price">-</p>
+            <p class="mini-change"><span class="change-value">-</span></p>
+            <p class="mini-meta">-</p>
+          </article>
+          <article class="mini-card loading" data-sector="FINANCE">
+            <p class="mini-name">금융 (은행,증권)</p>
+            <p class="mini-price">-</p>
+            <p class="mini-change"><span class="change-value">-</span></p>
+            <p class="mini-meta">-</p>
+          </article>
+          <article class="mini-card loading" data-sector="CONSUMER_GOODS">
+            <p class="mini-name">음식료/소비재</p>
+            <p class="mini-price">-</p>
+            <p class="mini-change"><span class="change-value">-</span></p>
+            <p class="mini-meta">-</p>
+          </article>
+          <article class="mini-card loading" data-sector="DISTRIBUTION">
+            <p class="mini-name">유통</p>
+            <p class="mini-price">-</p>
+            <p class="mini-change"><span class="change-value">-</span></p>
+            <p class="mini-meta">-</p>
+          </article>
+          <article class="mini-card loading" data-sector="PHARMA_BIO">
+            <p class="mini-name">제약/바이오</p>
+            <p class="mini-price">-</p>
+            <p class="mini-change"><span class="change-value">-</span></p>
+            <p class="mini-meta">-</p>
+          </article>
+          <article class="mini-card loading" data-sector="SERVICES">
+            <p class="mini-name">서비스</p>
+            <p class="mini-price">-</p>
+            <p class="mini-change"><span class="change-value">-</span></p>
+            <p class="mini-meta">-</p>
+          </article>
+          <article class="mini-card loading" data-sector="LOGISTICS">
+            <p class="mini-name">물류</p>
+            <p class="mini-price">-</p>
+            <p class="mini-change"><span class="change-value">-</span></p>
+            <p class="mini-meta">-</p>
+          </article>
+          <article class="mini-card loading" data-sector="SHIPBUILDING_SHIPPING">
+            <p class="mini-name">조선/해운</p>
+            <p class="mini-price">-</p>
+            <p class="mini-change"><span class="change-value">-</span></p>
+            <p class="mini-meta">-</p>
+          </article>
+        </div>
+
+        <p class="sentiment-disclaimer">
+          "오늘" 수치는 네이버페이 증권의 WICS 업종분류 79개를 위 12개 카테고리로 묶어 종목수 가중평균한 값입니다.
+          "분기 누적"은 이 페이지를 운영하기 시작한 날부터 매일 장마감 후 자동 기록한 값을 복리로 누적한 것이라,
+          지나간 분기 초반 데이터는 소급 반영되지 않으며 분기가 바뀌면 다시 0%부터 쌓입니다. 투자 자문이 아닙니다.
+        </p>
+      </main>
+
+      <footer class="site-footer">
+        <div class="container">
+          <p>데이터 제공: 네이버페이 증권 (WICS 업종분류)</p>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script src="compass.js"></script>
+</body>
+</html>

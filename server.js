@@ -384,6 +384,181 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
+// ── 증시나침반 (업종별 강세/약세) ──
+
+// WICS(와이즈산업분류) 79개 세부업종을 "한국 산업의 생태계" 이미지의 12개
+// 광역 카테고리로 묶는 매핑. no 25("기타")는 미분류 종목 1,500여개가
+// 뭉쳐있는 잡동사니 버킷이라 어느 카테고리에도 넣지 않고 제외한다.
+const INDUSTRY_SECTORS = [
+  { id: 'STEEL_NONFERROUS', name: '철강/비철금속', groups: [304, 322] },
+  { id: 'AUTO_MACHINERY', name: '자동차/기계', groups: [273, 270, 299, 306, 284] },
+  {
+    id: 'IT_ELECTRONICS',
+    name: '정보기술/가전',
+    groups: [278, 282, 307, 267, 287, 293, 292, 327, 269, 294, 338, 283, 298],
+  },
+  { id: 'ENERGY_MATERIALS', name: '에너지와 소재', groups: [325, 312, 331, 318, 295, 311, 272, 313] },
+  { id: 'CONSTRUCTION', name: '건설', groups: [279, 280, 320, 289] },
+  { id: 'FINANCE', name: '금융 (은행,증권)', groups: [315, 301, 337, 319, 321, 330, 277] },
+  { id: 'CONSUMER_GOODS', name: '음식료/소비재', groups: [275, 266, 271, 303, 268, 274, 309, 297] },
+  { id: 'DISTRIBUTION', name: '유통', groups: [334, 308, 332, 264, 328, 302, 265] },
+  { id: 'PHARMA_BIO', name: '제약/바이오', groups: [262, 288, 281, 316, 261, 286] },
+  { id: 'SERVICES', name: '서비스', groups: [285, 336, 324, 314, 333, 317, 339, 263, 310, 290, 300, 276] },
+  { id: 'LOGISTICS', name: '물류', groups: [326, 329, 296, 305] },
+  { id: 'SHIPBUILDING_SHIPPING', name: '조선/해운', groups: [291, 323] },
+];
+
+const INDUSTRY_GROUP_TO_SECTOR = new Map();
+INDUSTRY_SECTORS.forEach((sector) => {
+  sector.groups.forEach((no) => INDUSTRY_GROUP_TO_SECTOR.set(no, sector.id));
+});
+
+// m.stock.naver.com's own mobile-app API for the "업종" tab: free, no key,
+// 20 industries per page across ~79 WICS industries total.
+async function fetchIndustryGroups() {
+  const pages = await Promise.all(
+    [1, 2, 3, 4].map((page) =>
+      fetchWithRetry(`https://m.stock.naver.com/api/stocks/industry?page=${page}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
+      }).then((r) => r.json())
+    )
+  );
+
+  return pages.flatMap((page) => page.groups || []).filter((g) => g.no !== 25);
+}
+
+// Rolls the 79 WICS industries up into the 12 broad sectors, weighting each
+// industry's change rate by how many stocks it contains so a 1-stock
+// industry can't swing a sector as much as a 150-stock one.
+function aggregateIndustrySectors(groups) {
+  const bySector = new Map();
+
+  groups.forEach((g) => {
+    const sectorId = INDUSTRY_GROUP_TO_SECTOR.get(g.no);
+    if (!sectorId) return;
+    if (!bySector.has(sectorId)) {
+      bySector.set(sectorId, { weightedSum: 0, totalCount: 0, riseCount: 0, fallCount: 0 });
+    }
+    const bucket = bySector.get(sectorId);
+    const count = g.totalCount || 0;
+    bucket.weightedSum += Number(g.changeRate) * count;
+    bucket.totalCount += count;
+    bucket.riseCount += g.riseCount || 0;
+    bucket.fallCount += g.fallCount || 0;
+  });
+
+  return INDUSTRY_SECTORS.map((sector) => {
+    const bucket = bySector.get(sector.id);
+    if (!bucket || !bucket.totalCount) {
+      return { id: sector.id, name: sector.name, changeRate: null, riseCount: 0, fallCount: 0 };
+    }
+    return {
+      id: sector.id,
+      name: sector.name,
+      changeRate: bucket.weightedSum / bucket.totalCount,
+      riseCount: bucket.riseCount,
+      fallCount: bucket.fallCount,
+    };
+  });
+}
+
+function kstQuarterStartDateString() {
+  const [y, m] = todayKstDateString().split('-').map(Number);
+  const quarterStartMonth = Math.floor((m - 1) / 3) * 3 + 1;
+  return `${y}-${String(quarterStartMonth).padStart(2, '0')}-01`;
+}
+
+// Captures today's closing sector snapshot once per day so a quarter-to-date
+// return can be compounded later. Simple overwrite-on-rerun (unlike the
+// prediction gauge's freeze/update split) since this just records a fact,
+// not a call that would be lookahead-biased by re-recording it.
+async function captureIndustryHistory() {
+  if (!db || isKstWeekend()) return;
+
+  const groups = await fetchIndustryGroups();
+  const sectors = aggregateIndustrySectors(groups);
+  const date = todayKstDateString();
+
+  await db
+    .collection('industryHistory')
+    .doc(date)
+    .set({
+      date,
+      sectors: Object.fromEntries(sectors.map((s) => [s.id, s.changeRate])),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+}
+
+// Compounds each sector's daily % change across every captured trading day
+// since the current quarter began, so the cumulative figure self-resets
+// every Jan/Apr/Jul/Oct without any manual bookkeeping.
+async function fetchQuarterCumulative() {
+  if (!db) return null;
+
+  const quarterStart = kstQuarterStartDateString();
+  const snapshot = await db
+    .collection('industryHistory')
+    .where('date', '>=', quarterStart)
+    .orderBy('date', 'asc')
+    .get();
+
+  if (snapshot.empty) return { tradingDays: 0, quarterStart, sectors: {} };
+
+  const cumulative = {};
+  INDUSTRY_SECTORS.forEach((s) => {
+    cumulative[s.id] = 1;
+  });
+
+  snapshot.docs.forEach((doc) => {
+    const data = doc.data().sectors || {};
+    INDUSTRY_SECTORS.forEach((s) => {
+      const rate = data[s.id];
+      if (typeof rate === 'number') cumulative[s.id] *= 1 + rate / 100;
+    });
+  });
+
+  const sectors = {};
+  INDUSTRY_SECTORS.forEach((s) => {
+    sectors[s.id] = (cumulative[s.id] - 1) * 100;
+  });
+
+  return { tradingDays: snapshot.docs.length, quarterStart, sectors };
+}
+
+app.get('/api/industry-compass', async (req, res) => {
+  try {
+    const [groups, quarterCumulative] = await Promise.all([
+      fetchIndustryGroups(),
+      fetchQuarterCumulative().catch((err) => {
+        console.error('Failed to fetch quarter cumulative:', err.message);
+        return null;
+      }),
+    ]);
+
+    res.json({
+      sectors: aggregateIndustrySectors(groups),
+      quarterCumulative,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('Failed to fetch industry compass:', err.message);
+    res.status(502).json({ error: 'Failed to fetch industry data' });
+  }
+});
+
+// Dedicated endpoint for the daily GitHub Actions cron trigger (run shortly
+// after KOSPI's close), so quarter-to-date history builds up even if nobody
+// visits the site that day.
+app.get('/api/industry-compass/capture', async (req, res) => {
+  try {
+    await captureIndustryHistory();
+    res.json({ ok: true, date: todayKstDateString() });
+  } catch (err) {
+    console.error('Manual industry capture failed:', err.message);
+    res.status(502).json({ error: 'Capture failed' });
+  }
+});
+
 function directionOf(change) {
   if (change === null || Number.isNaN(change)) return 'EVEN';
   if (change > 0) return 'RISING';

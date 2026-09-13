@@ -4,11 +4,18 @@ on:
   schedule:
     # 00:05 UTC = 09:05 KST, shortly after KOSPI's market open
     - cron: '5 0 * * 1-5'
+    # 06:35 UTC = 15:35 KST, shortly after KOSPI's market close
+    - cron: '35 6 * * 1-5'
   workflow_dispatch: {}
 
 jobs:
   capture:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger capture endpoint
+      - name: Trigger signal-gauge capture (market open)
+        if: github.event.schedule == '5 0 * * 1-5' || github.event_name == 'workflow_dispatch'
         run: curl -sf https://stockmarket-bgh0.onrender.com/api/stats/capture
+
+      - name: Trigger industry-compass capture (market close)
+        if: github.event.schedule == '35 6 * * 1-5' || github.event_name == 'workflow_dispatch'
+        run: curl -sf https://stockmarket-bgh0.onrender.com/api/industry-compass/capture
