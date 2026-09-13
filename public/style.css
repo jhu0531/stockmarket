@@ -817,6 +817,10 @@ main {
   background: #f59e0b;
 }
 
+.dot-expiry {
+  background: #8b5cf6;
+}
+
 .calendar-nav {
   display: flex;
   align-items: center;
@@ -943,6 +947,10 @@ main {
 
 .calendar-cell-event.dot-gov {
   border-left-color: #f59e0b;
+}
+
+.calendar-cell-event.dot-expiry {
+  border-left-color: #8b5cf6;
 }
 
 .calendar-cell-event.calendar-cell-more {

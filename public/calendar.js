@@ -3,6 +3,7 @@ const TYPE_LABEL = {
   RATE_US: 'FOMC',
   HOLIDAY: '휴장일',
   GOV: '정부일정',
+  EXPIRY: '선물옵션 만기일',
 };
 
 const TYPE_CLASS = {
@@ -10,6 +11,7 @@ const TYPE_CLASS = {
   RATE_US: 'dot-rate',
   HOLIDAY: 'dot-holiday',
   GOV: 'dot-gov',
+  EXPIRY: 'dot-expiry',
 };
 
 const WEEKDAY_KR = ['일', '월', '화', '수', '목', '금', '토'];

@@ -926,7 +926,27 @@ const GOV_ECONOMY_KEYWORDS = [
   '점검회의',
   '업무보고',
   '민관합동',
+  '정상회담',
+  '비즈니스',
 ];
+
+// 코스피200 선물·옵션 + 개별주식 선물·옵션이 동시에 만료되는 날("콰드러플
+// 위칭데이"). 3·6·9·12월의 둘째 목요일이라는 고정 규칙이라 연도만 넣으면
+// 계산되고, 손으로 날짜를 입력할 때 생기는 오타 위험이 없다.
+function getQuadrupleWitchingDays(year) {
+  return [3, 6, 9, 12].map((month) => {
+    const firstOfMonth = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+    const firstThursday = 1 + ((4 - firstOfMonth + 7) % 7);
+    const secondThursday = firstThursday + 7;
+    return {
+      date: `${year}-${String(month).padStart(2, '0')}-${String(secondThursday).padStart(2, '0')}`,
+      type: 'EXPIRY',
+      title: '선물옵션 동시만기일 (콰드러플 위칭데이)',
+    };
+  });
+}
+
+const QUADRUPLE_WITCHING_DAYS_2026 = getQuadrupleWitchingDays(2026);
 
 function kstYearMonth(monthOffset) {
   const [y, m] = todayKstDateString().split('-').map(Number);
@@ -977,7 +997,7 @@ app.get('/api/calendar', async (req, res) => {
   if (status === 'rejected') console.error('Failed to fetch gov schedule:', reason.message);
   const govEvents = status === 'fulfilled' ? value : [];
 
-  const events = [...MACRO_EVENTS_2026, ...govEvents].sort((a, b) =>
+  const events = [...MACRO_EVENTS_2026, ...QUADRUPLE_WITCHING_DAYS_2026, ...govEvents].sort((a, b) =>
     a.date < b.date ? -1 : a.date > b.date ? 1 : 0
   );
 
