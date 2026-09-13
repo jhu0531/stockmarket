@@ -76,6 +76,7 @@ const usCards = Object.fromEntries(
 const usdKrwCard = document.getElementById('usd-krw-card');
 const yield10yCard = document.getElementById('us-yield10y-card');
 const spreadCard = document.getElementById('us-spread-card');
+const joblessCard = document.getElementById('us-jobless-card');
 const depositsCard = document.getElementById('deposits-card');
 const marginCard = document.getElementById('margin-card');
 const commodityCards = Object.fromEntries(
@@ -99,6 +100,7 @@ const ALL_LEADING_CARDS = [
   usdKrwCard,
   yield10yCard,
   spreadCard,
+  joblessCard,
   depositsCard,
   marginCard,
   ...Object.values(commodityCards),
@@ -340,6 +342,12 @@ async function loadLeadingIndicators() {
       formatValue: (d) => `${d.value.toFixed(2)}%p`,
       formatChange: (d) => `${Math.abs(d.change).toFixed(2)}%p (전일대비)`,
       meta: (d) => `${d.date} 기준${d.value < 0 ? ' · 장단기 역전' : ''}`,
+    });
+
+    renderMetricCard(joblessCard, data.jobless, {
+      formatValue: (d) => `${d.value.toLocaleString()}건`,
+      formatChange: (d) => `${Math.abs(d.change).toLocaleString()}건 (전주대비)`,
+      meta: (d) => `${d.date} 기준 (주간)`,
     });
 
     renderMetricCard(depositsCard, data.fundFlow && data.fundFlow.deposits, {

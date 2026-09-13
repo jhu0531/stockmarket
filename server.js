@@ -188,6 +188,7 @@ const LEADING_INDICATOR_SOURCES = {
   usdKrw: fetchUsdKrw,
   yield10y: () => fetchFredSeries('DGS10'),
   spread10y2y: () => fetchFredSeries('T10Y2Y'),
+  jobless: () => fetchFredSeries('ICSA'),
   usFedRate: fetchUsFedRate,
   krBaseRate: () => fetchEcosSeries('722Y001', ['0101000']),
   bsi: () => fetchEcosSeries('512Y014', ['99988', 'BA']),
@@ -252,6 +253,7 @@ async function buildLeadingIndicatorsPayload() {
       kosdaq: values.kosdaqFlow,
     },
     bdi: values.bdi,
+    jobless: values.jobless,
     fundFlow: values.fundFlow,
     commodities: values.commodities || [],
     newsSentiment: {
@@ -441,7 +443,12 @@ function computeSignalScore(payload) {
   if (oilEntries.length) {
     addSignal('국제 유가 (WTI·브렌트)', averageDirection(oilEntries.map((c) => c.direction)), { invert: true });
   }
+  const copper = payload.commodities.find((c) => c.code === 'COPPER');
+  if (copper) addSignal('구리 (Dr. Copper)', copper.direction);
+  const gold = payload.commodities.find((c) => c.code === 'GOLD');
+  if (gold) addSignal('금 (안전자산 선호)', gold.direction, { invert: true });
   if (payload.bdi) addSignal('BDI (발틱운임지수)', payload.bdi.direction);
+  if (payload.jobless) addSignal('美 신규 실업수당청구건수', payload.jobless.direction, { invert: true });
   if (payload.fundFlow && payload.fundFlow.deposits) addSignal('고객예탁금', payload.fundFlow.deposits.direction);
   if (payload.newsSentiment.domestic) addSignal('국내뉴스 심리', payload.newsSentiment.domestic.direction);
   if (payload.newsSentiment.foreign) addSignal('해외뉴스 심리', payload.newsSentiment.foreign.direction);
