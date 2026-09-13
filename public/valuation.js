@@ -68,34 +68,48 @@ function renderValuations(items) {
 
   items.forEach((item) => {
     const li = document.createElement('li');
-    li.className = 'valuation-card';
+    li.className = 'valuation-item';
 
-    const name = document.createElement('p');
-    name.className = 'valuation-name';
-    name.textContent = item.name || item.code;
-    li.appendChild(name);
-
-    if (item.error || !item.fairValue) {
-      const empty = document.createElement('p');
-      empty.className = 'valuation-empty';
-      empty.textContent = '적정주가를 계산할 데이터가 없습니다 (적자기업이거나 실적 데이터 없음).';
-      li.appendChild(empty);
+    if (item.error || !item.fairValue || !item.fairValue.confirmed) {
+      li.innerHTML = `
+        <div class="valuation-item-empty">
+          <p class="valuation-toggle-name">${item.name || item.code}</p>
+          <p class="valuation-empty">적정주가를 계산할 데이터가 없습니다 (적자기업이거나 실적 데이터 없음).</p>
+        </div>
+      `;
       listEl.appendChild(li);
       return;
     }
 
-    const current = document.createElement('p');
-    current.className = 'valuation-current';
-    current.innerHTML = `<span class="valuation-label">현재가</span><span class="valuation-value">${
-      item.currentPrice !== null ? item.currentPrice.toLocaleString() + '원' : '-'
-    }</span>`;
-    li.appendChild(current);
+    const primary = item.fairValue.confirmed;
 
-    li.appendChild(renderFairValueBlock('확정 실적 기준', item.fairValue.confirmed));
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'valuation-toggle';
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.innerHTML = `
+      <span class="valuation-toggle-name">${item.name || item.code}</span>
+      <span class="valuation-toggle-price">${item.currentPrice !== null ? item.currentPrice.toLocaleString() + '원' : '-'}</span>
+      <span class="valuation-toggle-fair">→ ${primary.fairValue.toLocaleString()}원</span>
+      ${primary.verdict ? `<span class="valuation-badge ${VERDICT_CLASS[primary.verdict]}">${VERDICT_LABEL[primary.verdict]} (${primary.gapRatio > 0 ? '+' : ''}${primary.gapRatio.toFixed(1)}%)</span>` : ''}
+    `;
+
+    const detail = document.createElement('div');
+    detail.className = 'valuation-detail';
+    detail.hidden = true;
+    detail.appendChild(renderFairValueBlock('확정 실적(TTM) 기준', primary));
     if (item.fairValue.consensus) {
-      li.appendChild(renderFairValueBlock('컨센서스(추정) 기준', item.fairValue.consensus));
+      detail.appendChild(renderFairValueBlock('컨센서스(추정) 기준', item.fairValue.consensus));
     }
 
+    toggle.addEventListener('click', () => {
+      const isOpen = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!isOpen));
+      detail.hidden = isOpen;
+    });
+
+    li.appendChild(toggle);
+    li.appendChild(detail);
     listEl.appendChild(li);
   });
 }

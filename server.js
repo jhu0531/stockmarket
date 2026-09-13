@@ -1258,57 +1258,78 @@ async function fetchStockSearch(query) {
 }
 
 // "김정환 적정주가 만능공식" (교재 확인): 적정주가 = (BPS×ROE)/r = EPS×12, r=1/12
-// 가정. EPS를 API가 직접 주므로 그 값을 그대로 12배 한다. 컨센서스(추정)
-// 연도가 아니라 가장 최근 확정 실적 연도를 사용한다.
-// 확정(최근 발표) 실적과, 있으면 컨센서스(애널리스트 추정) 실적 둘 다 계산해서
-// 반환한다. 반도체처럼 이익이 빠르게 바뀌는 종목은 두 값의 차이가 커서,
-// 어느 연도 실적을 쓰느냐에 따라 저평가/고평가 판정이 뒤집힐 수 있다.
-function computeFairValueForPeriod(financeInfo, period) {
-  const readValue = (title) => {
-    const row = financeInfo.rowList.find((r) => r.title === title);
-    const raw = row && row.columns[period.key] && row.columns[period.key].value;
-    if (!raw) return null;
-    const num = Number(String(raw).replace(/,/g, ''));
-    return Number.isNaN(num) ? null : num;
-  };
+// 가정. EPS를 API가 직접 주므로 그 값을 그대로 12배 한다.
+function readFinanceValue(financeInfo, title, periodKey) {
+  const row = financeInfo.rowList.find((r) => r.title === title);
+  const raw = row && row.columns[periodKey] && row.columns[periodKey].value;
+  if (!raw) return null;
+  const num = Number(String(raw).replace(/,/g, ''));
+  return Number.isNaN(num) ? null : num;
+}
 
-  const eps = readValue('EPS');
+// 연간 실적 하나만 쓰면 회계연도가 끝날 때까지 최대 9개월 묵은 값을 쓰게
+// 된다. 대신 가장 최근 "확정"(컨센서스 아닌) 분기 4개의 EPS를 그대로 합쳐
+// TTM(최근 12개월) 실적을 만든다 — 분기 실적이 발표될 때마다 갱신되므로
+// 항상 최신 상태를 반영한다. BPS/ROE는 (분기별로 누적이 아니라 그 분기의
+// 재무상태표 스냅샷이라) 가장 최근 분기 값을 그대로 쓴다.
+function computeTtmFairValue(quarterFinanceInfo) {
+  const confirmedQuarters = quarterFinanceInfo.trTitleList.filter((t) => t.isConsensus !== 'Y');
+  const last4 = confirmedQuarters.slice(-4);
+  if (last4.length < 4) return null;
+
+  const quarterlyEps = last4.map((p) => readFinanceValue(quarterFinanceInfo, 'EPS', p.key));
+  if (quarterlyEps.some((v) => v === null)) return null;
+
+  const ttmEps = quarterlyEps.reduce((sum, v) => sum + v, 0);
+  if (ttmEps <= 0) return null;
+
+  const latestQuarter = last4[last4.length - 1];
+
+  return {
+    period: `TTM ${last4[0].title}~${latestQuarter.title}`,
+    eps: ttmEps,
+    bps: readFinanceValue(quarterFinanceInfo, 'BPS', latestQuarter.key),
+    roe: readFinanceValue(quarterFinanceInfo, 'ROE', latestQuarter.key),
+    fairValue: Math.round(ttmEps * 12),
+  };
+}
+
+// 컨센서스(애널리스트 추정)는 분기별로 조각내 합칠 이유가 없어 연간
+// 데이터의 추정 연도를 그대로 사용한다.
+function computeConsensusFairValue(annualFinanceInfo) {
+  const consensusPeriod = [...annualFinanceInfo.trTitleList].reverse().find((t) => t.isConsensus === 'Y');
+  if (!consensusPeriod) return null;
+
+  const eps = readFinanceValue(annualFinanceInfo, 'EPS', consensusPeriod.key);
   if (!eps || eps <= 0) return null;
 
   return {
-    period: period.title,
+    period: consensusPeriod.title,
     eps,
-    bps: readValue('BPS'),
-    roe: readValue('ROE'),
+    bps: readFinanceValue(annualFinanceInfo, 'BPS', consensusPeriod.key),
+    roe: readFinanceValue(annualFinanceInfo, 'ROE', consensusPeriod.key),
     fairValue: Math.round(eps * 12),
   };
 }
 
-function computeFairValue(financeInfo) {
-  const periods = financeInfo.trTitleList;
-  const confirmedPeriod = [...periods].reverse().find((t) => t.isConsensus !== 'Y');
-  const consensusPeriod = [...periods].reverse().find((t) => t.isConsensus === 'Y');
-
-  const confirmed = confirmedPeriod ? computeFairValueForPeriod(financeInfo, confirmedPeriod) : null;
-  const consensus = consensusPeriod ? computeFairValueForPeriod(financeInfo, consensusPeriod) : null;
-  if (!confirmed) return null;
-
-  return { confirmed, consensus };
-}
-
 async function fetchStockValuation(code) {
-  const [priceData, financeData] = await Promise.all([
+  const [priceData, annualData, quarterData] = await Promise.all([
     fetchWithRetry(`https://polling.finance.naver.com/api/realtime/domestic/stock/${code}`, {
       headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://finance.naver.com/' },
     }).then((r) => r.json()),
     fetchWithRetry(`https://m.stock.naver.com/api/stock/${code}/finance/annual`, {
       headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
     }).then((r) => r.json()),
+    fetchWithRetry(`https://m.stock.naver.com/api/stock/${code}/finance/quarter`, {
+      headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
+    }).then((r) => r.json()),
   ]);
 
   const priceItem = priceData.datas && priceData.datas[0];
-  const fairValue = financeData.financeInfo ? computeFairValue(financeData.financeInfo) : null;
   const currentPrice = priceItem ? Number(priceItem.closePriceRaw) : null;
+
+  const confirmed = quarterData.financeInfo ? computeTtmFairValue(quarterData.financeInfo) : null;
+  const consensus = annualData.financeInfo ? computeConsensusFairValue(annualData.financeInfo) : null;
 
   const withVerdict = (fv) => {
     if (!fv || !currentPrice) return fv ? { ...fv, gapRatio: null, verdict: null } : null;
@@ -1324,9 +1345,7 @@ async function fetchStockValuation(code) {
     change: priceItem ? priceItem.compareToPreviousClosePrice : null,
     changeRatio: priceItem ? priceItem.fluctuationsRatio : null,
     direction: priceItem ? priceItem.compareToPreviousPrice.name : null,
-    fairValue: fairValue
-      ? { confirmed: withVerdict(fairValue.confirmed), consensus: withVerdict(fairValue.consensus) }
-      : null,
+    fairValue: confirmed || consensus ? { confirmed: withVerdict(confirmed), consensus: withVerdict(consensus) } : null,
   };
 }
 

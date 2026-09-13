@@ -1311,21 +1311,50 @@ main {
   gap: 0.75rem;
 }
 
-.valuation-card {
+.valuation-item {
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 1rem 1.1rem;
+  overflow: hidden;
 }
 
-.valuation-name {
-  margin: 0 0 0.6rem;
+.valuation-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  padding: 0.9rem 1.1rem;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.valuation-toggle:hover {
+  background: var(--border);
+}
+
+.valuation-toggle-name {
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.95rem;
+  flex-shrink: 0;
 }
 
-.valuation-current {
-  margin: 0 0 0.75rem;
+.valuation-toggle-price {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.valuation-toggle-fair {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.valuation-detail {
+  padding: 0 1.1rem 1rem;
 }
 
 .valuation-block {
@@ -1379,6 +1408,10 @@ main {
 
 .valuation-badge.flat {
   color: var(--flat);
+}
+
+.valuation-item-empty {
+  padding: 0.9rem 1.1rem;
 }
 
 .valuation-meta {
