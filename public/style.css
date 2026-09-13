@@ -859,6 +859,7 @@ main {
 
 .calendar-cell {
   min-height: 4.75rem;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
