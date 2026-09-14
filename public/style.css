@@ -1215,6 +1215,34 @@ main {
 
 /* ── 관심종목 / 적정주가 (로그인) ── */
 
+.group-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0 0 1.25rem;
+}
+
+.group-tab {
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.group-tab:hover {
+  background: var(--border);
+}
+
+.group-tab.active {
+  border-color: var(--text);
+  background: var(--border);
+}
+
 .auth-bar {
   display: flex;
   align-items: center;

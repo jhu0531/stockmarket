@@ -1372,12 +1372,13 @@ app.get('/api/watchlist', requireAuth, async (req, res) => {
 
     const items = await Promise.all(
       snapshot.docs.map(async (doc) => {
-        const { code, name } = doc.data();
+        const { code, name, group } = doc.data();
         try {
-          return await fetchStockValuation(code);
+          const valuation = await fetchStockValuation(code);
+          return { ...valuation, group: group || 1 };
         } catch (err) {
           console.error(`Failed to value ${code}:`, err.message);
-          return { code, name, error: true };
+          return { code, name, group: group || 1, error: true };
         }
       })
     );
@@ -1391,12 +1392,17 @@ app.get('/api/watchlist', requireAuth, async (req, res) => {
 
 app.post('/api/watchlist', requireAuth, async (req, res) => {
   const { code, name } = req.body || {};
+  const group = Number(req.body && req.body.group) || 1;
   if (!code || !name) return res.status(400).json({ error: 'code and name are required' });
+  if (!Number.isInteger(group) || group < 1 || group > 5) {
+    return res.status(400).json({ error: 'group must be an integer between 1 and 5' });
+  }
 
   try {
     await db.collection('users').doc(req.uid).collection('watchlist').doc(code).set({
       code,
       name,
+      group,
       addedAt: FieldValue.serverTimestamp(),
     });
     res.json({ ok: true });

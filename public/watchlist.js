@@ -1,4 +1,5 @@
 import { watchAuthState, loginWithGoogle, logout, getIdToken } from './firebase-init.js';
+import { getActiveGroup, renderGroupTabs } from './group-tabs.js';
 
 const authStatusEl = document.getElementById('auth-status');
 const loginBtn = document.getElementById('login-btn');
@@ -8,8 +9,11 @@ const loginRequiredEl = document.getElementById('watchlist-login-required');
 const searchInput = document.getElementById('stock-search-input');
 const searchResultsEl = document.getElementById('search-results');
 const listEl = document.getElementById('watchlist-list');
+const groupTabsEl = document.getElementById('group-tabs');
 
 const DIRECTION_CLASS = { RISING: 'up', FALLING: 'down', EVEN: 'flat' };
+
+let allItems = [];
 
 loginBtn.addEventListener('click', () => {
   loginWithGoogle().catch((err) => alert('로그인에 실패했습니다: ' + err.message));
@@ -88,7 +92,7 @@ async function addStock(code, name) {
   await fetch('/api/watchlist', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ code, name }),
+    body: JSON.stringify({ code, name, group: getActiveGroup() }),
   });
   searchInput.value = '';
   searchResultsEl.hidden = true;
@@ -111,7 +115,10 @@ async function loadWatchlist() {
     const res = await fetch('/api/watchlist', { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new Error('요청 실패');
     const data = await res.json();
-    renderWatchlist(data.items || []);
+    allItems = data.items || [];
+    renderGroupTabs(groupTabsEl, (group) => {
+      renderWatchlist(allItems.filter((item) => (item.group || 1) === group));
+    });
   } catch (err) {
     listEl.innerHTML = '<li class="calendar-empty">관심종목을 불러오지 못했습니다.</li>';
   }
@@ -120,7 +127,7 @@ async function loadWatchlist() {
 function renderWatchlist(items) {
   listEl.innerHTML = '';
   if (!items.length) {
-    listEl.innerHTML = '<li class="calendar-empty">추가된 관심종목이 없습니다. 위에서 검색해 추가해보세요.</li>';
+    listEl.innerHTML = '<li class="calendar-empty">이 그룹에 추가된 종목이 없습니다. 위에서 검색해 추가해보세요.</li>';
     return;
   }
 

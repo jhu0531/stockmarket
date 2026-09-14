@@ -1,4 +1,5 @@
 import { watchAuthState, loginWithGoogle, logout, getIdToken } from './firebase-init.js';
+import { renderGroupTabs } from './group-tabs.js';
 
 const authStatusEl = document.getElementById('auth-status');
 const loginBtn = document.getElementById('login-btn');
@@ -6,6 +7,9 @@ const logoutBtn = document.getElementById('logout-btn');
 const contentEl = document.getElementById('valuation-content');
 const loginRequiredEl = document.getElementById('valuation-login-required');
 const listEl = document.getElementById('valuation-list');
+const groupTabsEl = document.getElementById('group-tabs');
+
+let allItems = [];
 
 loginBtn.addEventListener('click', () => {
   loginWithGoogle().catch((err) => alert('로그인에 실패했습니다: ' + err.message));
@@ -48,7 +52,10 @@ async function loadValuations() {
     const res = await fetch('/api/watchlist', { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new Error('요청 실패');
     const data = await res.json();
-    renderValuations(data.items || []);
+    allItems = data.items || [];
+    renderGroupTabs(groupTabsEl, (group) => {
+      renderValuations(allItems.filter((item) => (item.group || 1) === group));
+    });
   } catch (err) {
     listEl.innerHTML = '<li class="calendar-empty">적정주가를 불러오지 못했습니다.</li>';
   }
@@ -62,7 +69,7 @@ function renderValuations(items) {
 
   if (!items.length) {
     listEl.innerHTML =
-      '<li class="calendar-empty">관심종목이 없습니다. <a href="/watchlist.html">관심종목</a>에서 먼저 추가해주세요.</li>';
+      '<li class="calendar-empty">이 그룹에 추가된 종목이 없습니다. <a href="/watchlist.html">관심종목</a>에서 추가해주세요.</li>';
     return;
   }
 
