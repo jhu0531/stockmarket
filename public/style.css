@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light dark;
   --bg: #f5f6f8;
   --card-bg: #ffffff;
   --text: #1a1c1e;
@@ -24,8 +25,15 @@
   }
 }
 
-/* Explicit toggle wins over prefers-color-scheme in both directions. */
+/* Explicit toggle wins over prefers-color-scheme in both directions, and
+   pins color-scheme so native controls (scrollbars, form fields, and
+   mobile browsers with their own "force dark" mode) don't fight it. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #14161a;
   --card-bg: #1f2227;
   --text: #f1f2f4;

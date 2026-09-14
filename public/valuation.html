@@ -14,7 +14,10 @@
   <script>
     (function () {
       var saved = localStorage.getItem('theme');
+      var theme = saved === 'light' || saved === 'dark' ? saved : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
       if (saved === 'light' || saved === 'dark') document.documentElement.setAttribute('data-theme', saved);
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', theme === 'dark' ? '#14161a' : '#f5f6f8');
     })();
   </script>
 </head>
