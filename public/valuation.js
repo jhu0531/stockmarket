@@ -121,6 +121,12 @@ function renderValuations(items) {
   });
 }
 
+// API 값은 억원 단위. 1조원(=10,000억) 이상이면 "조원"으로 줄여서 표시.
+function formatEokWon(value) {
+  if (Math.abs(value) >= 10000) return `${(value / 10000).toFixed(1)}조원`;
+  return `${value.toLocaleString()}억원`;
+}
+
 function renderFairValueBlock(title, fv) {
   const block = document.createElement('div');
   block.className = 'valuation-block';
@@ -156,9 +162,14 @@ function renderFairValueBlock(title, fv) {
     table.innerHTML = `
       <tbody>
         ${fv.quarters
-          .map(
-            (q) => `<tr><td>${q.period}</td><td>EPS ${q.eps.toLocaleString()}원</td></tr>`
-          )
+          .map((q) => {
+            const parts = [
+              q.revenue !== null ? `매출액 ${formatEokWon(q.revenue)}` : null,
+              q.operatingProfit !== null ? `영업이익 ${formatEokWon(q.operatingProfit)}` : null,
+              `EPS ${q.eps.toLocaleString()}원`,
+            ].filter(Boolean);
+            return `<tr><td>${q.period}</td><td>${parts.join(' · ')}</td></tr>`;
+          })
           .join('')}
       </tbody>
     `;

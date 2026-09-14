@@ -1291,7 +1291,12 @@ function computeTtmFairValue(quarterFinanceInfo) {
     bps: readFinanceValue(quarterFinanceInfo, 'BPS', latestQuarter.key),
     roe: readFinanceValue(quarterFinanceInfo, 'ROE', latestQuarter.key),
     fairValue: Math.round(ttmEps * 12),
-    quarters: last4.map((p, i) => ({ period: p.title, eps: quarterlyEps[i] })),
+    quarters: last4.map((p, i) => ({
+      period: p.title,
+      eps: quarterlyEps[i],
+      revenue: readFinanceValue(quarterFinanceInfo, '매출액', p.key),
+      operatingProfit: readFinanceValue(quarterFinanceInfo, '영업이익', p.key),
+    })),
   };
 }
 
