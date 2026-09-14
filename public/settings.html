@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>경제뉴스 | 주린이 기우제</title>
+  <title>설정 | 주린이 기우제</title>
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" href="/icons/favicon-32.png" sizes="32x32" />
   <link rel="icon" type="image/png" href="/icons/favicon-16.png" sizes="16x16" />
@@ -36,13 +36,13 @@
       <div class="sidebar-brand">🪶 주린이 기우제</div>
       <button type="button" id="mobile-menu-btn" class="sidebar-link mobile-menu-btn"><span class="sidebar-icon">☰</span><span>메뉴</span></button>
       <a href="/" class="sidebar-link"><span class="sidebar-icon">🏠</span><span>홈</span></a>
-      <a href="/news.html" class="sidebar-link active"><span class="sidebar-icon">📰</span><span>경제뉴스</span></a>
+      <a href="/news.html" class="sidebar-link"><span class="sidebar-icon">📰</span><span>경제뉴스</span></a>
       <a href="/calendar.html" class="sidebar-link"><span class="sidebar-icon">📅</span><span>캘린더</span></a>
       <a href="/reports.html" class="sidebar-link"><span class="sidebar-icon">📄</span><span>리포트</span></a>
       <a href="/compass.html" class="sidebar-link"><span class="sidebar-icon">🧭</span><span>나침반</span></a>
       <a href="/watchlist.html" class="sidebar-link desktop-only-link"><span class="sidebar-icon">⭐</span><span>관심종목</span></a>
       <a href="/valuation.html" class="sidebar-link desktop-only-link"><span class="sidebar-icon">🧮</span><span>적정주가</span></a>
-      <a href="/settings.html" class="sidebar-link desktop-only-link"><span class="sidebar-icon">⚙️</span><span>설정</span></a>
+      <a href="/settings.html" class="sidebar-link desktop-only-link active"><span class="sidebar-icon">⚙️</span><span>설정</span></a>
       <div class="mobile-menu-drawer" id="mobile-menu-drawer" hidden>
         <a href="/watchlist.html" class="mobile-menu-drawer-link"><span class="sidebar-icon">⭐</span><span>관심종목</span></a>
         <a href="/valuation.html" class="mobile-menu-drawer-link"><span class="sidebar-icon">🧮</span><span>적정주가</span></a>
@@ -53,53 +53,32 @@
     <div class="app-content">
       <header class="site-header">
         <div class="container">
-          <h1>경제뉴스</h1>
-          <p class="subtitle">해외뉴스 · 국내뉴스</p>
+          <h1>설정</h1>
+          <p class="subtitle">화면 표시 옵션</p>
         </div>
       </header>
 
       <main class="container">
-        <section class="news-section" id="ny-news-section">
-          <div class="section-header">
-            <h2 class="section-title">해외뉴스</h2>
-            <button id="news-section-toggle" class="section-toggle" type="button" aria-expanded="true" aria-controls="ny-news-list">
-              접기
-            </button>
+        <div class="settings-row">
+          <div>
+            <p class="settings-row-title">다크모드</p>
+            <p class="settings-row-desc">화면을 어둡게 표시합니다. 기기 설정을 따르지 않고 이 선택이 우선 적용됩니다.</p>
           </div>
-          <ul class="news-list" id="ny-news-list">
-            <li class="news-item news-loading">불러오는 중...</li>
-          </ul>
-        </section>
-
-        <section class="news-section" id="kr-news-section">
-          <div class="section-header">
-            <h2 class="section-title">국내뉴스</h2>
-            <button id="kr-news-section-toggle" class="section-toggle" type="button" aria-expanded="true" aria-controls="kr-news-body">
-              접기
-            </button>
-          </div>
-          <div id="kr-news-body">
-            <h3 class="news-subheading">거시경제</h3>
-            <ul class="news-list" id="kr-news-macro-list">
-              <li class="news-item news-loading">불러오는 중...</li>
-            </ul>
-            <h3 class="news-subheading">미시경제</h3>
-            <ul class="news-list" id="kr-news-micro-list">
-              <li class="news-item news-loading">불러오는 중...</li>
-            </ul>
-          </div>
-        </section>
+          <label class="theme-switch-wrap">
+            <input type="checkbox" id="theme-switch" />
+            <span class="theme-switch-slider"></span>
+          </label>
+        </div>
       </main>
 
       <footer class="site-footer">
         <div class="container">
-          <p>데이터 제공: 네이버 금융 · 자동 갱신 2분</p>
+          <p>주린이 기우제</p>
         </div>
       </footer>
     </div>
   </div>
 
-  <script src="news.js"></script>
   <script src="sidebar-menu.js"></script>
   <script src="theme-toggle.js"></script>
 </body>
