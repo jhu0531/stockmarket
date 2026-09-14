@@ -150,6 +150,21 @@ function renderFairValueBlock(title, fv) {
   }${fv.bps !== null ? ` · BPS ${fv.bps.toLocaleString()}원` : ''}`;
   block.appendChild(meta);
 
+  if (fv.quarters && fv.quarters.length) {
+    const table = document.createElement('table');
+    table.className = 'valuation-quarters';
+    table.innerHTML = `
+      <tbody>
+        ${fv.quarters
+          .map(
+            (q) => `<tr><td>${q.period}</td><td>EPS ${q.eps.toLocaleString()}원</td></tr>`
+          )
+          .join('')}
+      </tbody>
+    `;
+    block.appendChild(table);
+  }
+
   return block;
 }
 

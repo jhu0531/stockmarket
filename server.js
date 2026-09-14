@@ -1291,6 +1291,7 @@ function computeTtmFairValue(quarterFinanceInfo) {
     bps: readFinanceValue(quarterFinanceInfo, 'BPS', latestQuarter.key),
     roe: readFinanceValue(quarterFinanceInfo, 'ROE', latestQuarter.key),
     fairValue: Math.round(ttmEps * 12),
+    quarters: last4.map((p, i) => ({ period: p.title, eps: quarterlyEps[i] })),
   };
 }
 

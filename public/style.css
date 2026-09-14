@@ -1487,6 +1487,28 @@ main {
   color: var(--muted);
 }
 
+.valuation-quarters {
+  margin: 0.5rem 0 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.valuation-quarters td {
+  padding: 0.25rem 0;
+  color: var(--muted);
+  border-top: 1px dashed var(--border);
+}
+
+.valuation-quarters td:first-child {
+  width: 5rem;
+}
+
+.valuation-quarters tr:first-child td {
+  border-top: none;
+}
+
 /* ── 설정 ── */
 
 .settings-row {
