@@ -1335,6 +1335,18 @@ main {
   color: var(--down);
 }
 
+.watchlist-move {
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  padding: 0.3rem 0.5rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+
 .watchlist-remove {
   border: 1px solid var(--border);
   background: transparent;

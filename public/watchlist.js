@@ -109,6 +109,16 @@ async function removeStock(code) {
   loadWatchlist();
 }
 
+async function moveStock(code, group) {
+  const token = await getIdToken();
+  await fetch(`/api/watchlist/${code}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ group }),
+  });
+  loadWatchlist();
+}
+
 async function loadWatchlist() {
   const token = await getIdToken();
   try {
@@ -148,6 +158,18 @@ function renderWatchlist(items) {
       price.textContent = `${item.currentPrice.toLocaleString()} ${arrow} ${item.changeRatio}%`;
     }
 
+    const moveSelect = document.createElement('select');
+    moveSelect.className = 'watchlist-move';
+    moveSelect.title = '다른 그룹으로 이동';
+    for (let g = 1; g <= 5; g++) {
+      const option = document.createElement('option');
+      option.value = String(g);
+      option.textContent = `${g}그룹`;
+      if ((item.group || 1) === g) option.selected = true;
+      moveSelect.appendChild(option);
+    }
+    moveSelect.addEventListener('change', () => moveStock(item.code, Number(moveSelect.value)));
+
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'watchlist-remove';
@@ -156,6 +178,7 @@ function renderWatchlist(items) {
 
     li.appendChild(name);
     li.appendChild(price);
+    li.appendChild(moveSelect);
     li.appendChild(removeBtn);
     listEl.appendChild(li);
   });

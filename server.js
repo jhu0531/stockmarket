@@ -1412,6 +1412,21 @@ app.post('/api/watchlist', requireAuth, async (req, res) => {
   }
 });
 
+app.patch('/api/watchlist/:code', requireAuth, async (req, res) => {
+  const group = Number(req.body && req.body.group);
+  if (!Number.isInteger(group) || group < 1 || group > 5) {
+    return res.status(400).json({ error: 'group must be an integer between 1 and 5' });
+  }
+
+  try {
+    await db.collection('users').doc(req.uid).collection('watchlist').doc(req.params.code).update({ group });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Failed to move watchlist item:', err.message);
+    res.status(502).json({ error: 'Failed to move watchlist item' });
+  }
+});
+
 app.delete('/api/watchlist/:code', requireAuth, async (req, res) => {
   try {
     await db.collection('users').doc(req.uid).collection('watchlist').doc(req.params.code).delete();
