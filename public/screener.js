@@ -28,7 +28,7 @@ const FAIR_VERDICT_LABEL = { UNDERVALUED: '저평가', OVERVALUED: '고평가', 
 const FAIR_VERDICT_CLASS = { UNDERVALUED: 'up', OVERVALUED: 'down', FAIR: 'flat' };
 
 function renderFairValueBadge(item) {
-  if (!item.fairValue || !item.currentPrice) return '';
+  if (!item.fairValue || item.fairValue.fairValue === null || !item.currentPrice) return '';
 
   const gapRatio = ((item.fairValue.fairValue - item.currentPrice) / item.currentPrice) * 100;
   const verdict = gapRatio > 0 ? 'UNDERVALUED' : gapRatio < 0 ? 'OVERVALUED' : 'FAIR';
@@ -60,10 +60,16 @@ function renderDetail(item) {
     );
   }
 
+  const noFairValueNote =
+    item.fairValue.fairValue === null
+      ? '<p class="valuation-meta">최근 4분기 합산 실적이 적자라 적정주가는 계산하지 않았습니다.</p>'
+      : '';
+
   return `
     <div class="valuation-block">
       <p class="valuation-block-title">최근 4분기 + 작년 실적</p>
       <table class="valuation-quarters"><tbody>${rows.join('')}</tbody></table>
+      ${noFairValueNote}
     </div>
   `;
 }

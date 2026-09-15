@@ -77,7 +77,7 @@ function renderValuations(items) {
     const li = document.createElement('li');
     li.className = 'valuation-item';
 
-    if (item.error || !item.fairValue || !item.fairValue.confirmed) {
+    if (item.error || !item.fairValue || !item.fairValue.confirmed || item.fairValue.confirmed.fairValue === null) {
       li.innerHTML = `
         <div class="valuation-item-empty">
           <p class="valuation-toggle-name">${item.name || item.code}</p>

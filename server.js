@@ -1299,16 +1299,17 @@ function computeTtmFairValue(quarterFinanceInfo) {
   if (quarterlyEps.some((v) => v === null)) return null;
 
   const ttmEps = quarterlyEps.reduce((sum, v) => sum + v, 0);
-  if (ttmEps <= 0) return null;
-
   const latestQuarter = last4[last4.length - 1];
 
+  // 최근 4분기 합산이 적자(TTM EPS <= 0)면 "적정주가 = EPS×12"가 음수가 돼
+  // 의미가 없으므로 비워둔다. 다만 분기별 실적 내역(quarters)은 그 자체로
+  // 유용하니 계속 보여준다 — 막 흑자전환한 종목일수록 이 케이스가 흔하다.
   return {
     period: `TTM ${last4[0].title}~${latestQuarter.title}`,
     eps: ttmEps,
     bps: readFinanceValue(quarterFinanceInfo, 'BPS', latestQuarter.key),
     roe: readFinanceValue(quarterFinanceInfo, 'ROE', latestQuarter.key),
-    fairValue: Math.round(ttmEps * 12),
+    fairValue: ttmEps > 0 ? Math.round(ttmEps * 12) : null,
     quarters: last4.map((p, i) => ({
       period: p.title,
       eps: quarterlyEps[i],
@@ -1360,7 +1361,7 @@ async function fetchStockValuation(code, cachedConfirmed) {
   const consensus = annualData.financeInfo ? computeConsensusFairValue(annualData.financeInfo) : null;
 
   const withVerdict = (fv) => {
-    if (!fv || !currentPrice) return fv ? { ...fv, gapRatio: null, verdict: null } : null;
+    if (!fv || fv.fairValue === null || !currentPrice) return fv ? { ...fv, gapRatio: null, verdict: null } : null;
     const gapRatio = ((fv.fairValue - currentPrice) / currentPrice) * 100;
     const verdict = gapRatio > 0 ? 'UNDERVALUED' : gapRatio < 0 ? 'OVERVALUED' : 'FAIR';
     return { ...fv, gapRatio, verdict };
