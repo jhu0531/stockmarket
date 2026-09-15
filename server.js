@@ -1471,20 +1471,17 @@ function classifyGrowth(growth) {
   return null;
 }
 
-// 실적주 상세 펼치기에서 "작년 실적"으로 보여줄, 가장 최근 확정(컨센서스
-// 아닌) 연간 실적. 연간 데이터는 마지막 항목이 항상 컨센서스 추정 연도라
-// 뒤에서부터 찾는다.
-function getLastConfirmedAnnual(annualFinanceInfo) {
+// 실적주 상세 펼치기에서 "재작년/작년 실적"으로 보여줄, 최근 확정(컨센서스
+// 아닌) 연간 실적 최대 2개년치. trTitleList는 연도 오름차순이라 뒤에서
+// 2개를 자르면 [재작년, 작년] 순서가 그대로 나온다.
+function getRecentConfirmedAnnuals(annualFinanceInfo) {
   const confirmed = annualFinanceInfo.trTitleList.filter((t) => t.isConsensus !== 'Y');
-  if (!confirmed.length) return null;
-
-  const period = confirmed[confirmed.length - 1];
-  return {
+  return confirmed.slice(-2).map((period) => ({
     period: period.title,
     revenue: readFinanceValue(annualFinanceInfo, '매출액', period.key),
     operatingProfit: readFinanceValue(annualFinanceInfo, '영업이익', period.key),
     eps: readFinanceValue(annualFinanceInfo, 'EPS', period.key),
-  };
+  }));
 }
 
 async function captureScreenerHistory() {
@@ -1516,7 +1513,7 @@ async function captureScreenerHistory() {
         shortTerm: { growth: quarterGrowth, verdict: classifyGrowth(quarterGrowth) },
         longTerm: { growth: annualGrowth, verdict: classifyGrowth(annualGrowth) },
         fairValue: fairValue || null,
-        lastYear: annualData.financeInfo ? getLastConfirmedAnnual(annualData.financeInfo) : null,
+        recentAnnuals: annualData.financeInfo ? getRecentConfirmedAnnuals(annualData.financeInfo) : [],
       };
     } catch (err) {
       console.error(`Screener: failed to process ${s.itemCode}:`, err.message);

@@ -47,25 +47,27 @@ function renderFairValueBadge(item) {
   `;
 }
 
+const ANNUAL_LABELS = ['재작년', '작년'];
+
 function renderDetail(item) {
   if (!item.fairValue || !item.fairValue.quarters) {
     return '<p class="valuation-meta">상세 실적 데이터가 없습니다.</p>';
   }
 
-  const rows = item.fairValue.quarters.map(
+  const recentAnnuals = item.recentAnnuals || [];
+  // 확정 연도가 1개뿐이면(최근 상장 등) 그 하나는 "작년"으로 표시.
+  const annualLabels = recentAnnuals.length === 1 ? ['작년'] : ANNUAL_LABELS;
+  const annualRows = recentAnnuals.map((y, i) => {
+    const period = y.period.replace(/\.$/, '');
+    return `<tr><td>${period} (${annualLabels[i]})</td><td>매출액 ${formatEokWon(y.revenue)} · 영업이익 ${formatEokWon(
+      y.operatingProfit
+    )} · EPS ${y.eps !== null ? y.eps.toLocaleString() + '원' : '-'}</td></tr>`;
+  });
+
+  const quarterRows = item.fairValue.quarters.map(
     (q) =>
       `<tr><td>${q.period}</td><td>매출액 ${formatEokWon(q.revenue)} · 영업이익 ${formatEokWon(q.operatingProfit)} · EPS ${q.eps.toLocaleString()}원</td></tr>`
   );
-
-  if (item.lastYear) {
-    const y = item.lastYear;
-    const label = `${y.period.replace(/\.$/, '')} (작년)`;
-    rows.push(
-      `<tr><td>${label}</td><td>매출액 ${formatEokWon(y.revenue)} · 영업이익 ${formatEokWon(y.operatingProfit)} · EPS ${
-        y.eps !== null ? y.eps.toLocaleString() + '원' : '-'
-      }</td></tr>`
-    );
-  }
 
   const noFairValueNote =
     item.fairValue.fairValue === null
@@ -74,8 +76,8 @@ function renderDetail(item) {
 
   return `
     <div class="valuation-block">
-      <p class="valuation-block-title">최근 4분기 + 작년 실적</p>
-      <table class="valuation-quarters"><tbody>${rows.join('')}</tbody></table>
+      <p class="valuation-block-title">재작년·작년 + 최근 4분기 실적</p>
+      <table class="valuation-quarters"><tbody>${annualRows.join('')}${quarterRows.join('')}</tbody></table>
       ${noFairValueNote}
     </div>
   `;
