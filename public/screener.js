@@ -1,11 +1,18 @@
+const termSelectEl = document.getElementById('screener-term-select');
 const verdictSelectEl = document.getElementById('screener-verdict-select');
 const updatedEl = document.getElementById('screener-updated');
 const listEl = document.getElementById('screener-list');
 
 let allItems = [];
 
+const TERM_KEY = { short: 'shortTerm', long: 'longTerm' };
+
+termSelectEl.addEventListener('change', () => {
+  renderList();
+});
+
 verdictSelectEl.addEventListener('change', () => {
-  renderList(verdictSelectEl.value);
+  renderList();
 });
 
 function formatJoWon(marketCap) {
@@ -86,10 +93,13 @@ function growthMagnitude(growth) {
   return growth.operatingProfitGrowth === null ? 0 : Math.abs(growth.operatingProfitGrowth);
 }
 
-function renderList(verdict) {
+function renderList() {
+  const termKey = TERM_KEY[termSelectEl.value];
+  const verdict = verdictSelectEl.value;
+
   const items = allItems
-    .filter((item) => item.verdict === verdict)
-    .sort((a, b) => growthMagnitude(b.growth) - growthMagnitude(a.growth));
+    .filter((item) => item[termKey].verdict === verdict)
+    .sort((a, b) => growthMagnitude(b[termKey].growth) - growthMagnitude(a[termKey].growth));
 
   listEl.innerHTML = '';
 
@@ -99,11 +109,12 @@ function renderList(verdict) {
   }
 
   items.forEach((item) => {
+    const growth = item[termKey].growth;
     const li = document.createElement('li');
     li.className = `screener-item ${verdict === 'UP' ? 'up' : 'down'}`;
 
-    const opLabel = operatingProfitLabel(item.growth);
-    const revLabel = formatGrowth(item.growth.revenueGrowth);
+    const opLabel = operatingProfitLabel(growth);
+    const revLabel = formatGrowth(growth.revenueGrowth);
 
     const toggle = document.createElement('button');
     toggle.type = 'button';
@@ -154,9 +165,9 @@ async function loadScreener() {
     const res = await fetch('/api/screener');
     if (!res.ok) throw new Error('요청 실패');
     const data = await res.json();
-    allItems = (data.items || []).filter((item) => item.verdict && item.growth);
+    allItems = data.items || [];
     updatedEl.textContent = formatUpdatedAt(data.capturedAt);
-    renderList(verdictSelectEl.value);
+    renderList();
   } catch (err) {
     updatedEl.textContent = '데이터를 불러오지 못했습니다.';
     listEl.innerHTML = '<li class="calendar-empty">실적주 데이터를 불러오지 못했습니다.</li>';

@@ -1411,19 +1411,14 @@ async function fetchLargeCapStocks() {
   );
 }
 
-// 최근 확정분기와 그 직전 분기를 비교한 매출액/영업이익 증감률(직전분기 대비, QoQ).
-// 영업이익 흑자↔적자 전환은 %로 나타내면 왜곡되므로 turnaround로 별도 표시한다.
-function computeQuarterGrowth(quarterFinanceInfo) {
-  const confirmedQuarters = quarterFinanceInfo.trTitleList.filter((t) => t.isConsensus !== 'Y');
-  if (confirmedQuarters.length < 2) return null;
-
-  const prev = confirmedQuarters[confirmedQuarters.length - 2];
-  const latest = confirmedQuarters[confirmedQuarters.length - 1];
-
-  const prevRevenue = readFinanceValue(quarterFinanceInfo, '매출액', prev.key);
-  const latestRevenue = readFinanceValue(quarterFinanceInfo, '매출액', latest.key);
-  const prevOperatingProfit = readFinanceValue(quarterFinanceInfo, '영업이익', prev.key);
-  const latestOperatingProfit = readFinanceValue(quarterFinanceInfo, '영업이익', latest.key);
+// 두 시점(직전 vs 최근) 사이 매출액/영업이익 증감률(%)을 계산 — 분기(QoQ,
+// 단기실적)와 연간(YoY, 장기실적) 스크리너가 이 로직을 공유한다. 영업이익
+// 흑자↔적자 전환은 %로 나타내면 왜곡되므로 turnaround로 별도 표시한다.
+function computeGrowthBetweenPeriods(financeInfo, prev, latest) {
+  const prevRevenue = readFinanceValue(financeInfo, '매출액', prev.key);
+  const latestRevenue = readFinanceValue(financeInfo, '매출액', latest.key);
+  const prevOperatingProfit = readFinanceValue(financeInfo, '영업이익', prev.key);
+  const latestOperatingProfit = readFinanceValue(financeInfo, '영업이익', latest.key);
 
   const growthRatio = (before, after) =>
     before === null || after === null || before === 0 ? null : ((after - before) / Math.abs(before)) * 100;
@@ -1440,6 +1435,28 @@ function computeQuarterGrowth(quarterFinanceInfo) {
     operatingProfitGrowth: operatingProfitTurnaround ? null : growthRatio(prevOperatingProfit, latestOperatingProfit),
     operatingProfitTurnaround,
   };
+}
+
+// 단기실적: 최근 확정분기 vs 직전분기 (QoQ)
+function computeQuarterGrowth(quarterFinanceInfo) {
+  const confirmedQuarters = quarterFinanceInfo.trTitleList.filter((t) => t.isConsensus !== 'Y');
+  if (confirmedQuarters.length < 2) return null;
+  return computeGrowthBetweenPeriods(
+    quarterFinanceInfo,
+    confirmedQuarters[confirmedQuarters.length - 2],
+    confirmedQuarters[confirmedQuarters.length - 1]
+  );
+}
+
+// 장기실적: 최근 확정연도 vs 전년 (YoY)
+function computeAnnualGrowth(annualFinanceInfo) {
+  const confirmedYears = annualFinanceInfo.trTitleList.filter((t) => t.isConsensus !== 'Y');
+  if (confirmedYears.length < 2) return null;
+  return computeGrowthBetweenPeriods(
+    annualFinanceInfo,
+    confirmedYears[confirmedYears.length - 2],
+    confirmedYears[confirmedYears.length - 1]
+  );
 }
 
 // 영업이익 증감(또는 흑자/적자전환)만을 기준으로 상승/하락 후보를 가른다.
@@ -1485,9 +1502,10 @@ async function captureScreenerHistory() {
       ]);
       if (!quarterData.financeInfo) return null;
 
-      const growth = computeQuarterGrowth(quarterData.financeInfo);
+      const quarterGrowth = computeQuarterGrowth(quarterData.financeInfo);
+      const annualGrowth = annualData.financeInfo ? computeAnnualGrowth(annualData.financeInfo) : null;
       const fairValue = computeTtmFairValue(quarterData.financeInfo);
-      if (!growth && !fairValue) return null;
+      if (!quarterGrowth && !annualGrowth && !fairValue) return null;
 
       return {
         code: s.itemCode,
@@ -1495,8 +1513,8 @@ async function captureScreenerHistory() {
         market: s.sosok === '0' ? 'KOSPI' : 'KOSDAQ',
         marketCap: Number(s.marketValueRaw),
         currentPrice: Number(s.closePriceRaw),
-        growth,
-        verdict: classifyGrowth(growth),
+        shortTerm: { growth: quarterGrowth, verdict: classifyGrowth(quarterGrowth) },
+        longTerm: { growth: annualGrowth, verdict: classifyGrowth(annualGrowth) },
         fairValue: fairValue || null,
         lastYear: annualData.financeInfo ? getLastConfirmedAnnual(annualData.financeInfo) : null,
       };

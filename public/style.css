@@ -1200,6 +1200,17 @@ main {
 
 /* ── 실적주 ── */
 
+.screener-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.screener-controls .report-category-select {
+  margin: 1rem 0 0;
+  flex: 1 1 200px;
+}
+
 .screener-updated {
   margin: 0.75rem 0 0;
   font-size: 0.8rem;

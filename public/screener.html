@@ -64,10 +64,16 @@
       </header>
 
       <main class="container">
-        <select id="screener-verdict-select" class="report-category-select">
-          <option value="UP">상승 후보 (영업이익 개선)</option>
-          <option value="DOWN">하락 후보 (영업이익 악화)</option>
-        </select>
+        <div class="screener-controls">
+          <select id="screener-term-select" class="report-category-select">
+            <option value="short">단기실적 (직전분기 대비)</option>
+            <option value="long">장기실적 (전년 대비)</option>
+          </select>
+          <select id="screener-verdict-select" class="report-category-select">
+            <option value="UP">상승 후보 (영업이익 개선)</option>
+            <option value="DOWN">하락 후보 (영업이익 악화)</option>
+          </select>
+        </div>
 
         <p class="screener-updated" id="screener-updated">불러오는 중...</p>
 
@@ -75,10 +81,11 @@
           <li class="calendar-empty">불러오는 중...</li>
         </ul>
 
-        <p class="sentiment-disclaimer">
-          시가총액 1조원 이상 종목 중, 가장 최근 확정 분기의 영업이익이 직전분기 대비 ±50% 이상
-          변했거나 흑자/적자로 전환된 종목을 보여줍니다. 매출액은 참고용으로 함께 표시합니다.
-          매일 자정(00:00 KST)에 갱신되며, 투자 자문이 아니며 투자 판단과 책임은 본인에게 있습니다.
+        <p class="sentiment-disclaimer" id="screener-disclaimer">
+          시가총액 1조원 이상 종목 중, 영업이익이 ±50% 이상 변했거나 흑자/적자로 전환된 종목을
+          보여줍니다. "단기실적"은 가장 최근 확정 분기를 직전 분기와, "장기실적"은 가장 최근 확정
+          연도를 전년과 비교합니다. 매출액은 참고용으로 함께 표시합니다. 매일 자정(00:00 KST)에
+          갱신되며, 투자 자문이 아니며 투자 판단과 책임은 본인에게 있습니다.
         </p>
       </main>
 
