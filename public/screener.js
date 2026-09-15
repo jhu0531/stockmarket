@@ -12,10 +12,60 @@ function formatJoWon(marketCap) {
   return `${(marketCap / 1e12).toFixed(1)}조원`;
 }
 
+// 매출액/영업이익은 API가 억원 단위로 주므로, 1조 이상이면 조원으로 줄여 표시.
+function formatEokWon(value) {
+  if (value === null || value === undefined) return '-';
+  return Math.abs(value) >= 10000 ? `${(value / 10000).toFixed(1)}조원` : `${value.toLocaleString()}억원`;
+}
+
 function formatGrowth(growth) {
   if (growth === null || growth === undefined) return null;
   const sign = growth > 0 ? '+' : '';
   return `${sign}${growth.toFixed(1)}%`;
+}
+
+const FAIR_VERDICT_LABEL = { UNDERVALUED: '저평가', OVERVALUED: '고평가', FAIR: '적정' };
+const FAIR_VERDICT_CLASS = { UNDERVALUED: 'up', OVERVALUED: 'down', FAIR: 'flat' };
+
+function renderFairValueBadge(item) {
+  if (!item.fairValue || !item.currentPrice) return '';
+
+  const gapRatio = ((item.fairValue.fairValue - item.currentPrice) / item.currentPrice) * 100;
+  const verdict = gapRatio > 0 ? 'UNDERVALUED' : gapRatio < 0 ? 'OVERVALUED' : 'FAIR';
+  const sign = gapRatio > 0 ? '+' : '';
+
+  return `
+    <span class="screener-sub">적정주가 ${item.fairValue.fairValue.toLocaleString()}원</span>
+    <span class="valuation-badge ${FAIR_VERDICT_CLASS[verdict]}">${FAIR_VERDICT_LABEL[verdict]} (${sign}${gapRatio.toFixed(1)}%)</span>
+  `;
+}
+
+function renderDetail(item) {
+  if (!item.fairValue || !item.fairValue.quarters) {
+    return '<p class="valuation-meta">상세 실적 데이터가 없습니다.</p>';
+  }
+
+  const rows = item.fairValue.quarters.map(
+    (q) =>
+      `<tr><td>${q.period}</td><td>매출액 ${formatEokWon(q.revenue)} · 영업이익 ${formatEokWon(q.operatingProfit)} · EPS ${q.eps.toLocaleString()}원</td></tr>`
+  );
+
+  if (item.lastYear) {
+    const y = item.lastYear;
+    const label = `${y.period.replace(/\.$/, '')} (작년)`;
+    rows.push(
+      `<tr><td>${label}</td><td>매출액 ${formatEokWon(y.revenue)} · 영업이익 ${formatEokWon(y.operatingProfit)} · EPS ${
+        y.eps !== null ? y.eps.toLocaleString() + '원' : '-'
+      }</td></tr>`
+    );
+  }
+
+  return `
+    <div class="valuation-block">
+      <p class="valuation-block-title">최근 4분기 + 작년 실적</p>
+      <table class="valuation-quarters"><tbody>${rows.join('')}</tbody></table>
+    </div>
+  `;
 }
 
 function operatingProfitLabel(growth) {
@@ -49,7 +99,11 @@ function renderList(verdict) {
     const opLabel = operatingProfitLabel(item.growth);
     const revLabel = formatGrowth(item.growth.revenueGrowth);
 
-    li.innerHTML = `
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'screener-toggle';
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.innerHTML = `
       <div class="screener-item-top">
         <span class="screener-name">${item.name}</span>
         <span class="screener-market">${item.market}</span>
@@ -60,7 +114,22 @@ function renderList(verdict) {
         <span class="screener-badge">영업이익 ${opLabel}</span>
         ${revLabel ? `<span class="screener-sub">매출액 ${revLabel}</span>` : ''}
       </div>
+      ${item.fairValue ? `<div class="screener-item-bottom">${renderFairValueBadge(item)}</div>` : ''}
     `;
+
+    const detail = document.createElement('div');
+    detail.className = 'valuation-detail';
+    detail.hidden = true;
+    detail.innerHTML = renderDetail(item);
+
+    toggle.addEventListener('click', () => {
+      const isOpen = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!isOpen));
+      detail.hidden = isOpen;
+    });
+
+    li.appendChild(toggle);
+    li.appendChild(detail);
     listEl.appendChild(li);
   });
 }

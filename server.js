@@ -1453,15 +1453,35 @@ function classifyGrowth(growth) {
   return null;
 }
 
+// 실적주 상세 펼치기에서 "작년 실적"으로 보여줄, 가장 최근 확정(컨센서스
+// 아닌) 연간 실적. 연간 데이터는 마지막 항목이 항상 컨센서스 추정 연도라
+// 뒤에서부터 찾는다.
+function getLastConfirmedAnnual(annualFinanceInfo) {
+  const confirmed = annualFinanceInfo.trTitleList.filter((t) => t.isConsensus !== 'Y');
+  if (!confirmed.length) return null;
+
+  const period = confirmed[confirmed.length - 1];
+  return {
+    period: period.title,
+    revenue: readFinanceValue(annualFinanceInfo, '매출액', period.key),
+    operatingProfit: readFinanceValue(annualFinanceInfo, '영업이익', period.key),
+    eps: readFinanceValue(annualFinanceInfo, 'EPS', period.key),
+  };
+}
+
 async function captureScreenerHistory() {
   const stocks = await fetchLargeCapStocks();
 
   const items = await mapWithConcurrency(stocks, 15, async (s) => {
     try {
-      const upstream = await fetchWithRetry(`https://m.stock.naver.com/api/stock/${s.itemCode}/finance/quarter`, {
-        headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
-      });
-      const quarterData = await upstream.json();
+      const [quarterData, annualData] = await Promise.all([
+        fetchWithRetry(`https://m.stock.naver.com/api/stock/${s.itemCode}/finance/quarter`, {
+          headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
+        }).then((r) => r.json()),
+        fetchWithRetry(`https://m.stock.naver.com/api/stock/${s.itemCode}/finance/annual`, {
+          headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
+        }).then((r) => r.json()),
+      ]);
       if (!quarterData.financeInfo) return null;
 
       const growth = computeQuarterGrowth(quarterData.financeInfo);
@@ -1477,6 +1497,7 @@ async function captureScreenerHistory() {
         growth,
         verdict: classifyGrowth(growth),
         fairValue: fairValue || null,
+        lastYear: annualData.financeInfo ? getLastConfirmedAnnual(annualData.financeInfo) : null,
       };
     } catch (err) {
       console.error(`Screener: failed to process ${s.itemCode}:`, err.message);

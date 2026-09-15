@@ -1219,7 +1219,23 @@ main {
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
+  overflow: hidden;
+}
+
+.screener-toggle {
+  width: 100%;
+  display: block;
+  text-align: left;
   padding: 0.75rem 1rem;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.screener-toggle:hover {
+  background: var(--border);
 }
 
 .screener-item-top {
@@ -1587,6 +1603,8 @@ main {
 
 .valuation-quarters td:first-child {
   width: 5rem;
+  padding-right: 0.6rem;
+  white-space: nowrap;
 }
 
 .valuation-quarters tr:first-child td {
