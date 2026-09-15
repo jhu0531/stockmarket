@@ -1,7 +1,58 @@
 const listEl = document.getElementById('tradingvalue-list');
 const updatedEl = document.getElementById('tradingvalue-updated');
+const sortBtnEls = document.querySelectorAll('.sort-btn');
 
-const DIRECTION_CLASS = { RISING: 'up', FALLING: 'down', EVEN: 'flat' };
+// 네이버 API는 상한가/하한가를 RISING/FALLING이 아니라 별도 코드
+// (UPPER_LIMIT/LOWER_LIMIT)로 내려주므로 같이 up/down 취급해야 한다.
+const DIRECTION_CLASS = { RISING: 'up', UPPER_LIMIT: 'up', FALLING: 'down', LOWER_LIMIT: 'down', EVEN: 'flat' };
+const UP_DIRECTIONS = new Set(['RISING', 'UPPER_LIMIT']);
+const DOWN_DIRECTIONS = new Set(['FALLING', 'LOWER_LIMIT']);
+
+let allItems = [];
+let sortField = 'tradingValue';
+let sortDirection = 'desc';
+
+// FALLING의 fluctuationsRatio 문자열엔 "-"가 붙어있지만, 하한가(LOWER_LIMIT)는
+// RISING과 마찬가지로 부호 없이 절대값만 내려주므로 direction 기준으로 부호를
+// 다시 매긴다 (안 그러면 하한가 종목이 등락률 정렬에서 급등주로 취급됨).
+function signedChangeRatio(item) {
+  const magnitude = Math.abs(Number(item.changeRatio));
+  if (DOWN_DIRECTIONS.has(item.direction)) return -magnitude;
+  if (UP_DIRECTIONS.has(item.direction)) return magnitude;
+  return 0;
+}
+
+function sortValue(item, field) {
+  return field === 'changeRatio' ? signedChangeRatio(item) : item.tradingValue;
+}
+
+function applySort() {
+  const sorted = [...allItems].sort((a, b) => {
+    const diff = sortValue(b, sortField) - sortValue(a, sortField);
+    return sortDirection === 'desc' ? diff : -diff;
+  });
+
+  sortBtnEls.forEach((btn) => {
+    const isActive = btn.dataset.sort === sortField;
+    btn.classList.toggle('active', isActive);
+    btn.querySelector('.sort-icon').textContent = isActive ? (sortDirection === 'desc' ? '▼' : '▲') : '▼';
+  });
+
+  renderList(sorted);
+}
+
+sortBtnEls.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const field = btn.dataset.sort;
+    if (field === sortField) {
+      sortDirection = sortDirection === 'desc' ? 'asc' : 'desc';
+    } else {
+      sortField = field;
+      sortDirection = 'desc';
+    }
+    applySort();
+  });
+});
 
 function formatWon(value) {
   if (value === null || value === undefined) return '-';
@@ -12,8 +63,10 @@ function formatWon(value) {
 }
 
 function formatChangeRatio(direction, changeRatio) {
-  const sign = direction === 'RISING' ? '+' : '';
-  const arrow = direction === 'RISING' ? '▲' : direction === 'FALLING' ? '▼' : '-';
+  const isUp = UP_DIRECTIONS.has(direction);
+  const isDown = DOWN_DIRECTIONS.has(direction);
+  const sign = isUp ? '+' : '';
+  const arrow = isUp ? '▲' : isDown ? '▼' : '-';
   return `${arrow} ${sign}${changeRatio}%`;
 }
 
@@ -136,7 +189,8 @@ async function loadTradingValue() {
     if (!res.ok) throw new Error('요청 실패');
     const data = await res.json();
     updatedEl.textContent = formatUpdatedAt(data.updatedAt);
-    renderList(data.items || []);
+    allItems = data.items || [];
+    applySort();
   } catch (err) {
     updatedEl.textContent = '데이터를 불러오지 못했습니다.';
     listEl.innerHTML = '<li class="calendar-empty">거래대금상위 데이터를 불러오지 못했습니다.</li>';

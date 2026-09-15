@@ -1226,6 +1226,33 @@ main {
   gap: 0.5rem;
 }
 
+.tradingvalue-sort-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.sort-btn {
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--muted);
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-family: inherit;
+  font-weight: 600;
+}
+
+.sort-btn.active {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.sort-icon {
+  font-size: 0.7rem;
+}
+
 .screener-item {
   background: var(--card-bg);
   border: 1px solid var(--border);
