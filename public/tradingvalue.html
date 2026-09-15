@@ -66,6 +66,12 @@
       </header>
 
       <main class="container">
+        <div class="auth-bar">
+          <span id="auth-status">로그인 확인 중...</span>
+          <button id="login-btn" type="button" class="auth-btn" hidden>구글로 로그인</button>
+          <button id="logout-btn" type="button" class="auth-btn" hidden>로그아웃</button>
+        </div>
+
         <p class="screener-updated" id="tradingvalue-updated">불러오는 중...</p>
 
         <div class="tradingvalue-sort-bar">
@@ -92,7 +98,7 @@
     </div>
   </div>
 
-  <script src="tradingvalue.js"></script>
+  <script type="module" src="tradingvalue.js"></script>
   <script src="sidebar-menu.js"></script>
   <script src="theme-toggle.js"></script>
 </body>

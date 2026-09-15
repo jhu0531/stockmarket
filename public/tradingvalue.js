@@ -1,6 +1,77 @@
+import { watchAuthState, loginWithGoogle, logout, getIdToken } from './firebase-init.js';
+
 const listEl = document.getElementById('tradingvalue-list');
 const updatedEl = document.getElementById('tradingvalue-updated');
 const sortBtnEls = document.querySelectorAll('.sort-btn');
+const authStatusEl = document.getElementById('auth-status');
+const loginBtnEl = document.getElementById('login-btn');
+const logoutBtnEl = document.getElementById('logout-btn');
+
+let currentUser = null;
+let watchlistCodes = new Set();
+
+loginBtnEl.addEventListener('click', () => {
+  loginWithGoogle().catch((err) => alert('로그인에 실패했습니다: ' + err.message));
+});
+
+logoutBtnEl.addEventListener('click', () => {
+  logout();
+});
+
+async function loadWatchlistCodes() {
+  try {
+    const token = await getIdToken();
+    const res = await fetch('/api/watchlist/codes', { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error('요청 실패');
+    const data = await res.json();
+    watchlistCodes = new Set(data.codes || []);
+  } catch (err) {
+    watchlistCodes = new Set();
+  }
+}
+
+async function addToWatchlist(item, button) {
+  if (!currentUser) {
+    if (confirm('관심종목에 추가하려면 로그인이 필요합니다. 로그인할까요?')) {
+      loginWithGoogle().catch((err) => alert('로그인에 실패했습니다: ' + err.message));
+    }
+    return;
+  }
+
+  button.disabled = true;
+  try {
+    const token = await getIdToken();
+    await fetch('/api/watchlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ code: item.code, name: item.name, group: 1 }),
+    });
+    watchlistCodes.add(item.code);
+    button.textContent = '추가됨';
+  } catch (err) {
+    button.disabled = false;
+    alert('관심종목 추가에 실패했습니다.');
+  }
+}
+
+const initialAuth = new Promise((resolveInitialAuth) => {
+  watchAuthState(async (user) => {
+    currentUser = user;
+    if (user) {
+      authStatusEl.textContent = `${user.displayName || user.email}님으로 로그인됨`;
+      loginBtnEl.hidden = true;
+      logoutBtnEl.hidden = false;
+      await loadWatchlistCodes();
+    } else {
+      authStatusEl.textContent = '로그인하면 관심종목에 바로 추가할 수 있습니다.';
+      loginBtnEl.hidden = false;
+      logoutBtnEl.hidden = true;
+      watchlistCodes = new Set();
+    }
+    if (allItems.length) applySort();
+    resolveInitialAuth();
+  });
+});
 
 // 네이버 API는 상한가/하한가를 RISING/FALLING이 아니라 별도 코드
 // (UPPER_LIMIT/LOWER_LIMIT)로 내려주므로 같이 up/down 취급해야 한다.
@@ -68,6 +139,12 @@ function formatChangeRatio(direction, changeRatio) {
   const sign = isUp ? '+' : '';
   const arrow = isUp ? '▲' : isDown ? '▼' : '-';
   return `${arrow} ${sign}${changeRatio}%`;
+}
+
+function formatSector(sector) {
+  if (!sector) return '';
+  const sign = sector.changeRate > 0 ? '+' : '';
+  return `${sector.name} ${sign}${sector.changeRate.toFixed(1)}%`;
 }
 
 function formatNetBuy(value) {
@@ -155,6 +232,7 @@ function renderList(items) {
       <div class="screener-item-bottom">
         <span class="screener-price">${item.currentPrice.toLocaleString()}원</span>
         <span class="screener-badge">${formatChangeRatio(item.direction, item.changeRatio)}</span>
+        ${item.sector ? `<span class="screener-sub">${formatSector(item.sector)}</span>` : ''}
       </div>
     `;
 
@@ -169,7 +247,20 @@ function renderList(items) {
       detail.hidden = isOpen;
     });
 
+    const actions = document.createElement('div');
+    actions.className = 'screener-actions';
+
+    const watchBtn = document.createElement('button');
+    watchBtn.type = 'button';
+    watchBtn.className = 'screener-watch-btn';
+    const isWatched = watchlistCodes.has(item.code);
+    watchBtn.textContent = isWatched ? '추가됨' : '+ 관심종목';
+    watchBtn.disabled = isWatched;
+    watchBtn.addEventListener('click', () => addToWatchlist(item, watchBtn));
+    actions.appendChild(watchBtn);
+
     li.appendChild(toggle);
+    li.appendChild(actions);
     li.appendChild(detail);
     listEl.appendChild(li);
   });
@@ -205,4 +296,4 @@ function hideLoadingOverlay() {
 }
 
 const minDisplayTime = new Promise((resolve) => setTimeout(resolve, 1500));
-Promise.all([loadTradingValue(), minDisplayTime]).finally(hideLoadingOverlay);
+Promise.all([loadTradingValue(), initialAuth, minDisplayTime]).finally(hideLoadingOverlay);

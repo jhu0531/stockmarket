@@ -1670,6 +1670,18 @@ app.delete('/api/watchlist/:code', requireAuth, async (req, res) => {
   }
 });
 
+// 거래대금상위처럼 "이 종목 이미 관심종목에 있나?"만 가볍게 확인할 때 쓴다 —
+// /api/watchlist는 종목마다 적정주가까지 계산해서 이 용도엔 과하다.
+app.get('/api/watchlist/codes', requireAuth, async (req, res) => {
+  try {
+    const snapshot = await db.collection('users').doc(req.uid).collection('watchlist').get();
+    res.json({ codes: snapshot.docs.map((doc) => doc.id) });
+  } catch (err) {
+    console.error('Failed to fetch watchlist codes:', err.message);
+    res.status(502).json({ error: 'Failed to fetch watchlist codes' });
+  }
+});
+
 // ── 거래대금상위 (오늘 거래대금 상위 종목 + 외국인/기관 순매수 + 관련 뉴스) ──
 // 매매 추천이 아니라 사실 데이터 표시용 — "지금 사라"는 신호가 아니라 "오늘
 // 거래가 활발한 종목이 뭔지" 보여주는 용도.
@@ -1714,7 +1726,11 @@ async function fetchStockNews(code, limit) {
 }
 
 async function computeTopTradingValue() {
-  const topStocks = await fetchTopTradingValueStocks();
+  const [topStocks, industryGroups] = await Promise.all([fetchTopTradingValueStocks(), fetchIndustryGroups()]);
+
+  // WICS 세부업종(no) -> {name, changeRate}. integration의 industryCode가
+  // 이 no와 같은 체계라 이미 나침반에서 부르는 데이터를 그대로 재활용한다.
+  const sectorByNo = new Map(industryGroups.map((g) => [g.no, { name: g.name, changeRate: Number(g.changeRate) }]));
 
   return mapWithConcurrency(topStocks, 10, async (s) => {
     const base = {
@@ -1735,10 +1751,15 @@ async function computeTopTradingValue() {
         fetchStockNews(s.itemCode, TRADING_VALUE_NEWS_LIMIT).catch(() => []),
       ]);
 
-      return { ...base, dealTrend: extractTodayDealTrend(integrationData.dealTrendInfos), news };
+      return {
+        ...base,
+        dealTrend: extractTodayDealTrend(integrationData.dealTrendInfos),
+        sector: sectorByNo.get(Number(integrationData.industryCode)) || null,
+        news,
+      };
     } catch (err) {
       console.error(`TradingValue: failed to process ${s.itemCode}:`, err.message);
-      return { ...base, dealTrend: null, news: [] };
+      return { ...base, dealTrend: null, sector: null, news: [] };
     }
   });
 }
