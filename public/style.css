@@ -1198,6 +1198,90 @@ main {
   background: var(--border);
 }
 
+/* ── 실적주 ── */
+
+.screener-updated {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.screener-list {
+  list-style: none;
+  margin: 0.75rem 0 1.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.screener-item {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+}
+
+.screener-item-top {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.screener-name {
+  font-weight: 700;
+}
+
+.screener-market {
+  font-size: 0.7rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+}
+
+.screener-cap {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.screener-item-bottom {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.screener-price {
+  font-variant-numeric: tabular-nums;
+  color: var(--flat);
+}
+
+.screener-badge {
+  font-weight: 700;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.screener-item.up .screener-badge {
+  color: var(--up);
+}
+
+.screener-item.down .screener-badge {
+  color: var(--down);
+}
+
+.screener-sub {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 /* ── 관심종목 / 적정주가 (로그인) ── */
 
 .group-tabs {

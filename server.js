@@ -159,6 +159,24 @@ async function fetchWithRetry(url, options, attempts = RETRY_ATTEMPTS) {
   throw lastErr;
 }
 
+// Runs `fn` over `items` with at most `limit` in flight at once — used for the
+// nightly screener batch (~300 stocks) so we don't fire them all at once.
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await fn(items[index], index);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 async function fetchNaverIndices({ market, symbols, type = 'index' }) {
   const upstream = await fetchWithRetry(
     `https://polling.finance.naver.com/api/realtime/${market}/${type}/${symbols}`,
@@ -1318,7 +1336,9 @@ function computeConsensusFairValue(annualFinanceInfo) {
   };
 }
 
-async function fetchStockValuation(code) {
+// cachedConfirmed는 실적주 야간 배치(screenerCache)에 이미 이 종목의 확정
+// TTM 적정주가가 있으면 그걸 그대로 재사용해서 분기실적 API 호출을 건너뛴다.
+async function fetchStockValuation(code, cachedConfirmed) {
   const [priceData, annualData, quarterData] = await Promise.all([
     fetchWithRetry(`https://polling.finance.naver.com/api/realtime/domestic/stock/${code}`, {
       headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://finance.naver.com/' },
@@ -1326,15 +1346,17 @@ async function fetchStockValuation(code) {
     fetchWithRetry(`https://m.stock.naver.com/api/stock/${code}/finance/annual`, {
       headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
     }).then((r) => r.json()),
-    fetchWithRetry(`https://m.stock.naver.com/api/stock/${code}/finance/quarter`, {
-      headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
-    }).then((r) => r.json()),
+    cachedConfirmed
+      ? Promise.resolve(null)
+      : fetchWithRetry(`https://m.stock.naver.com/api/stock/${code}/finance/quarter`, {
+          headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
+        }).then((r) => r.json()),
   ]);
 
   const priceItem = priceData.datas && priceData.datas[0];
   const currentPrice = priceItem ? Number(priceItem.closePriceRaw) : null;
 
-  const confirmed = quarterData.financeInfo ? computeTtmFairValue(quarterData.financeInfo) : null;
+  const confirmed = cachedConfirmed || (quarterData && quarterData.financeInfo ? computeTtmFairValue(quarterData.financeInfo) : null);
   const consensus = annualData.financeInfo ? computeConsensusFairValue(annualData.financeInfo) : null;
 
   const withVerdict = (fv) => {
@@ -1355,6 +1377,176 @@ async function fetchStockValuation(code) {
   };
 }
 
+// ── 실적주 스크리너 (시가총액 1조원 이상, 직전분기 대비 실적 급변 종목) ──
+
+const SCREENER_MARKET_CAP_THRESHOLD = 1e12; // 1조원
+const SCREENER_GROWTH_THRESHOLD = 50; // 영업이익 직전분기 대비 ±50%
+
+async function fetchMarketValueList(category) {
+  const pageSize = 100;
+  let page = 1;
+  let all = [];
+
+  while (true) {
+    const upstream = await fetchWithRetry(
+      `https://m.stock.naver.com/api/stocks/marketValue/${category}?page=${page}&pageSize=${pageSize}`,
+      { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' } }
+    );
+    const json = await upstream.json();
+    const stocks = json.stocks || [];
+    all = all.concat(stocks);
+    if (stocks.length === 0 || all.length >= json.totalCount || page > 30) break;
+    page += 1;
+  }
+
+  return all;
+}
+
+// KOSPI+KOSDAQ 전체 상장 종목 중 ETF/ETN을 뺀 시가총액 1조원 이상 종목만 추린다.
+async function fetchLargeCapStocks() {
+  const [kospi, kosdaq] = await Promise.all([fetchMarketValueList('KOSPI'), fetchMarketValueList('KOSDAQ')]);
+  return kospi.concat(kosdaq).filter(
+    (s) => s.stockEndType === 'stock' && Number(s.marketValueRaw) >= SCREENER_MARKET_CAP_THRESHOLD
+  );
+}
+
+// 최근 확정분기와 그 직전 분기를 비교한 매출액/영업이익 증감률(직전분기 대비, QoQ).
+// 영업이익 흑자↔적자 전환은 %로 나타내면 왜곡되므로 turnaround로 별도 표시한다.
+function computeQuarterGrowth(quarterFinanceInfo) {
+  const confirmedQuarters = quarterFinanceInfo.trTitleList.filter((t) => t.isConsensus !== 'Y');
+  if (confirmedQuarters.length < 2) return null;
+
+  const prev = confirmedQuarters[confirmedQuarters.length - 2];
+  const latest = confirmedQuarters[confirmedQuarters.length - 1];
+
+  const prevRevenue = readFinanceValue(quarterFinanceInfo, '매출액', prev.key);
+  const latestRevenue = readFinanceValue(quarterFinanceInfo, '매출액', latest.key);
+  const prevOperatingProfit = readFinanceValue(quarterFinanceInfo, '영업이익', prev.key);
+  const latestOperatingProfit = readFinanceValue(quarterFinanceInfo, '영업이익', latest.key);
+
+  const growthRatio = (before, after) =>
+    before === null || after === null || before === 0 ? null : ((after - before) / Math.abs(before)) * 100;
+
+  let operatingProfitTurnaround = null;
+  if (prevOperatingProfit !== null && latestOperatingProfit !== null) {
+    if (prevOperatingProfit <= 0 && latestOperatingProfit > 0) operatingProfitTurnaround = 'PROFIT';
+    else if (prevOperatingProfit > 0 && latestOperatingProfit <= 0) operatingProfitTurnaround = 'LOSS';
+  }
+
+  return {
+    period: `${prev.title}→${latest.title}`,
+    revenueGrowth: growthRatio(prevRevenue, latestRevenue),
+    operatingProfitGrowth: operatingProfitTurnaround ? null : growthRatio(prevOperatingProfit, latestOperatingProfit),
+    operatingProfitTurnaround,
+  };
+}
+
+// 영업이익 증감(또는 흑자/적자전환)만을 기준으로 상승/하락 후보를 가른다.
+// 매출액은 참고 정보로만 같이 보여준다.
+function classifyGrowth(growth) {
+  if (!growth) return null;
+  if (growth.operatingProfitTurnaround === 'PROFIT') return 'UP';
+  if (growth.operatingProfitTurnaround === 'LOSS') return 'DOWN';
+  if (growth.operatingProfitGrowth === null) return null;
+  if (growth.operatingProfitGrowth >= SCREENER_GROWTH_THRESHOLD) return 'UP';
+  if (growth.operatingProfitGrowth <= -SCREENER_GROWTH_THRESHOLD) return 'DOWN';
+  return null;
+}
+
+async function captureScreenerHistory() {
+  const stocks = await fetchLargeCapStocks();
+
+  const items = await mapWithConcurrency(stocks, 15, async (s) => {
+    try {
+      const upstream = await fetchWithRetry(`https://m.stock.naver.com/api/stock/${s.itemCode}/finance/quarter`, {
+        headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
+      });
+      const quarterData = await upstream.json();
+      if (!quarterData.financeInfo) return null;
+
+      const growth = computeQuarterGrowth(quarterData.financeInfo);
+      const fairValue = computeTtmFairValue(quarterData.financeInfo);
+      if (!growth && !fairValue) return null;
+
+      return {
+        code: s.itemCode,
+        name: s.stockName,
+        market: s.sosok === '0' ? 'KOSPI' : 'KOSDAQ',
+        marketCap: Number(s.marketValueRaw),
+        currentPrice: Number(s.closePriceRaw),
+        growth,
+        verdict: classifyGrowth(growth),
+        fairValue: fairValue || null,
+      };
+    } catch (err) {
+      console.error(`Screener: failed to process ${s.itemCode}:`, err.message);
+      return null;
+    }
+  });
+
+  const validItems = items.filter(Boolean);
+
+  await db.collection('screenerCache').doc('latest').set({
+    capturedAt: FieldValue.serverTimestamp(),
+    items: validItems,
+  });
+
+  return validItems.length;
+}
+
+let screenerMapCache = null;
+let screenerMapCacheAt = 0;
+const SCREENER_MAP_CACHE_TTL_MS = 5 * 60 * 1000;
+
+// 관심종목/적정주가 탭이 야간 배치 결과를 재사용할 수 있도록 code -> 적정주가
+// 맵으로 변환해 잠깐(5분) 메모리에 캐싱해둔다 (매 요청마다 Firestore 안 읽게).
+async function getScreenerFairValueMap() {
+  const now = Date.now();
+  if (screenerMapCache && now - screenerMapCacheAt < SCREENER_MAP_CACHE_TTL_MS) return screenerMapCache;
+
+  const map = new Map();
+  try {
+    const doc = await db.collection('screenerCache').doc('latest').get();
+    if (doc.exists) {
+      (doc.data().items || []).forEach((item) => {
+        if (item.fairValue) map.set(item.code, item.fairValue);
+      });
+    }
+  } catch (err) {
+    console.error('Failed to load screener cache map:', err.message);
+  }
+
+  screenerMapCache = map;
+  screenerMapCacheAt = now;
+  return map;
+}
+
+app.get('/api/screener/capture', async (req, res) => {
+  try {
+    const count = await captureScreenerHistory();
+    res.json({ ok: true, count });
+  } catch (err) {
+    console.error('Manual screener capture failed:', err.message);
+    res.status(502).json({ error: 'Failed to capture screener data' });
+  }
+});
+
+app.get('/api/screener', async (req, res) => {
+  try {
+    const doc = await db.collection('screenerCache').doc('latest').get();
+    if (!doc.exists) return res.json({ items: [], capturedAt: null });
+
+    const data = doc.data();
+    res.json({
+      items: data.items || [],
+      capturedAt: data.capturedAt ? data.capturedAt.toDate().toISOString() : null,
+    });
+  } catch (err) {
+    console.error('Failed to fetch screener cache:', err.message);
+    res.status(502).json({ error: 'Failed to fetch screener data' });
+  }
+});
+
 app.get('/api/stock-search', async (req, res) => {
   const query = (req.query.q || '').trim();
   if (!query) return res.json({ results: [] });
@@ -1369,18 +1561,16 @@ app.get('/api/stock-search', async (req, res) => {
 
 app.get('/api/watchlist', requireAuth, async (req, res) => {
   try {
-    const snapshot = await db
-      .collection('users')
-      .doc(req.uid)
-      .collection('watchlist')
-      .orderBy('addedAt', 'asc')
-      .get();
+    const [snapshot, screenerFairValueMap] = await Promise.all([
+      db.collection('users').doc(req.uid).collection('watchlist').orderBy('addedAt', 'asc').get(),
+      getScreenerFairValueMap(),
+    ]);
 
     const items = await Promise.all(
       snapshot.docs.map(async (doc) => {
         const { code, name, group } = doc.data();
         try {
-          const valuation = await fetchStockValuation(code);
+          const valuation = await fetchStockValuation(code, screenerFairValueMap.get(code));
           return { ...valuation, group: group || 1 };
         } catch (err) {
           console.error(`Failed to value ${code}:`, err.message);

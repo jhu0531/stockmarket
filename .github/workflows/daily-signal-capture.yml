@@ -6,6 +6,10 @@ on:
     - cron: '5 0 * * 1-5'
     # 06:35 UTC = 15:35 KST, shortly after KOSPI's market close
     - cron: '35 6 * * 1-5'
+    # 15:00 UTC = 00:00 KST the NEXT calendar day. To land at 00:00 KST on
+    # Mon~Fri (so it captures each weekday's closing data), this must fire on
+    # Sun~Thu in UTC (weekday 0-4), one calendar day "early" from KST's view.
+    - cron: '0 15 * * 0-4'
   workflow_dispatch: {}
 
 jobs:
@@ -19,3 +23,7 @@ jobs:
       - name: Trigger industry-compass capture (market close)
         if: github.event.schedule == '35 6 * * 1-5' || github.event_name == 'workflow_dispatch'
         run: curl -sf https://stockmarket-bgh0.onrender.com/api/industry-compass/capture
+
+      - name: Trigger 실적주 screener capture (midnight KST, after quarterly data settles)
+        if: github.event.schedule == '0 15 * * 0-4' || github.event_name == 'workflow_dispatch'
+        run: curl -sf https://stockmarket-bgh0.onrender.com/api/screener/capture
