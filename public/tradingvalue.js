@@ -38,6 +38,11 @@ async function addToWatchlist(item, button) {
     return;
   }
 
+  if (watchlistCodes.has(item.code)) {
+    alert('이미 관심종목에 있는 종목입니다.');
+    return;
+  }
+
   button.disabled = true;
   try {
     const token = await getIdToken();
@@ -94,7 +99,9 @@ function signedChangeRatio(item) {
 }
 
 function sortValue(item, field) {
-  return field === 'changeRatio' ? signedChangeRatio(item) : item.tradingValue;
+  if (field === 'changeRatio') return signedChangeRatio(item);
+  if (field === 'sector') return item.sector ? item.sector.changeRate : 0;
+  return item.tradingValue;
 }
 
 function applySort() {
@@ -144,7 +151,8 @@ function formatChangeRatio(direction, changeRatio) {
 function formatSector(sector) {
   if (!sector) return '';
   const sign = sector.changeRate > 0 ? '+' : '';
-  return `${sector.name} ${sign}${sector.changeRate.toFixed(1)}%`;
+  const cls = sector.changeRate > 0 ? 'up' : sector.changeRate < 0 ? 'down' : 'flat';
+  return `${sector.name} <span class="screener-sector-rate ${cls}">${sign}${sector.changeRate.toFixed(1)}%</span>`;
 }
 
 function formatNetBuy(value) {
@@ -253,9 +261,7 @@ function renderList(items) {
     const watchBtn = document.createElement('button');
     watchBtn.type = 'button';
     watchBtn.className = 'screener-watch-btn';
-    const isWatched = watchlistCodes.has(item.code);
-    watchBtn.textContent = isWatched ? '추가됨' : '+ 관심종목';
-    watchBtn.disabled = isWatched;
+    watchBtn.textContent = '+ 관심종목';
     watchBtn.addEventListener('click', () => addToWatchlist(item, watchBtn));
     actions.appendChild(watchBtn);
 

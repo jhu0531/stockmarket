@@ -1364,6 +1364,14 @@ main {
   color: var(--muted);
 }
 
+.screener-sector-rate.up {
+  color: var(--up);
+}
+
+.screener-sector-rate.down {
+  color: var(--down);
+}
+
 /* ── 관심종목 / 적정주가 (로그인) ── */
 
 .group-tabs {
