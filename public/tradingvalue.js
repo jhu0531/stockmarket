@@ -97,7 +97,7 @@ function renderList(items) {
       <div class="screener-item-top">
         <span class="screener-name">${item.name}</span>
         <span class="screener-market">${item.market}</span>
-        <span class="screener-cap">${formatWon(item.tradingValue)}</span>
+        <span class="screener-cap">거래대금 ${formatWon(item.tradingValue)}</span>
       </div>
       <div class="screener-item-bottom">
         <span class="screener-price">${item.currentPrice.toLocaleString()}원</span>
