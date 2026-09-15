@@ -1670,6 +1670,101 @@ app.delete('/api/watchlist/:code', requireAuth, async (req, res) => {
   }
 });
 
+// ── 거래대금상위 (오늘 거래대금 상위 종목 + 외국인/기관 순매수 + 관련 뉴스) ──
+// 매매 추천이 아니라 사실 데이터 표시용 — "지금 사라"는 신호가 아니라 "오늘
+// 거래가 활발한 종목이 뭔지" 보여주는 용도.
+
+const TRADING_VALUE_TOP_N = 30;
+const TRADING_VALUE_NEWS_LIMIT = 5;
+const TRADING_VALUE_CACHE_TTL_MS = 3 * 60 * 1000;
+
+async function fetchTopTradingValueStocks() {
+  const [kospi, kosdaq] = await Promise.all([fetchMarketValueList('KOSPI'), fetchMarketValueList('KOSDAQ')]);
+  return kospi
+    .concat(kosdaq)
+    .filter((s) => s.stockEndType === 'stock')
+    .sort((a, b) => Number(b.accumulatedTradingValueRaw) - Number(a.accumulatedTradingValueRaw))
+    .slice(0, TRADING_VALUE_TOP_N);
+}
+
+// dealTrendInfos는 최신순으로 정렬돼 있어 [0]이 가장 최근 거래일(오늘)이다.
+function extractTodayDealTrend(dealTrendInfos) {
+  if (!dealTrendInfos || !dealTrendInfos.length) return null;
+  const today = dealTrendInfos[0];
+  const parseQuant = (v) => (v ? Number(String(v).replace(/,/g, '')) : null);
+  return {
+    date: today.bizdate,
+    foreignerNetBuy: parseQuant(today.foreignerPureBuyQuant),
+    institutionNetBuy: parseQuant(today.organPureBuyQuant),
+  };
+}
+
+async function fetchStockNews(code, limit) {
+  const upstream = await fetchWithRetry(`https://m.stock.naver.com/api/news/stock/${code}?pageSize=${limit}`, {
+    headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
+  });
+  const json = await upstream.json();
+  const items = (json[0] && json[0].items) || [];
+  return items.map((item) => ({
+    title: item.title,
+    office: item.officeName,
+    link: item.mobileNewsUrl,
+    date: item.datetime,
+  }));
+}
+
+async function computeTopTradingValue() {
+  const topStocks = await fetchTopTradingValueStocks();
+
+  return mapWithConcurrency(topStocks, 10, async (s) => {
+    const base = {
+      code: s.itemCode,
+      name: s.stockName,
+      market: s.sosok === '0' ? 'KOSPI' : 'KOSDAQ',
+      currentPrice: Number(s.closePriceRaw),
+      changeRatio: s.fluctuationsRatio,
+      direction: s.compareToPreviousPrice.name,
+      tradingValue: Number(s.accumulatedTradingValueRaw),
+    };
+
+    try {
+      const [integrationData, news] = await Promise.all([
+        fetchWithRetry(`https://m.stock.naver.com/api/stock/${s.itemCode}/integration`, {
+          headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
+        }).then((r) => r.json()),
+        fetchStockNews(s.itemCode, TRADING_VALUE_NEWS_LIMIT).catch(() => []),
+      ]);
+
+      return { ...base, dealTrend: extractTodayDealTrend(integrationData.dealTrendInfos), news };
+    } catch (err) {
+      console.error(`TradingValue: failed to process ${s.itemCode}:`, err.message);
+      return { ...base, dealTrend: null, news: [] };
+    }
+  });
+}
+
+let tradingValueCache = null;
+let tradingValueCacheAt = 0;
+
+async function getTopTradingValueCached() {
+  const now = Date.now();
+  if (tradingValueCache && now - tradingValueCacheAt < TRADING_VALUE_CACHE_TTL_MS) return tradingValueCache;
+
+  const items = await computeTopTradingValue();
+  tradingValueCache = { items, updatedAt: new Date().toISOString() };
+  tradingValueCacheAt = now;
+  return tradingValueCache;
+}
+
+app.get('/api/trading-value', async (req, res) => {
+  try {
+    res.json(await getTopTradingValueCached());
+  } catch (err) {
+    console.error('Failed to fetch trading value ranking:', err.message);
+    res.status(502).json({ error: 'Failed to fetch trading value ranking' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>통계 | 주린이 기우제</title>
+  <title>거래대금상위 | 주린이 기우제</title>
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" href="/icons/favicon-32.png" sizes="32x32" />
   <link rel="icon" type="image/png" href="/icons/favicon-16.png" sizes="16x16" />
@@ -38,7 +38,7 @@
     <nav class="sidebar">
       <div class="sidebar-brand">🪶 주린이 기우제</div>
       <button type="button" id="mobile-menu-btn" class="sidebar-link mobile-menu-btn"><span class="sidebar-icon">☰</span><span>메뉴</span></button>
-      <a href="/" class="sidebar-link active"><span class="sidebar-icon">🏠</span><span>홈</span></a>
+      <a href="/" class="sidebar-link"><span class="sidebar-icon">🏠</span><span>홈</span></a>
       <a href="/news.html" class="sidebar-link"><span class="sidebar-icon">📰</span><span>경제뉴스</span></a>
       <a href="/calendar.html" class="sidebar-link"><span class="sidebar-icon">📅</span><span>캘린더</span></a>
       <a href="/reports.html" class="sidebar-link"><span class="sidebar-icon">📄</span><span>리포트</span></a>
@@ -46,7 +46,7 @@
       <a href="/watchlist.html" class="sidebar-link desktop-only-link"><span class="sidebar-icon">⭐</span><span>관심종목</span></a>
       <a href="/valuation.html" class="sidebar-link desktop-only-link"><span class="sidebar-icon">🧮</span><span>적정주가</span></a>
       <a href="/screener.html" class="sidebar-link desktop-only-link"><span class="sidebar-icon">📊</span><span>실적주</span></a>
-      <a href="/tradingvalue.html" class="sidebar-link desktop-only-link"><span class="sidebar-icon">💰</span><span>거래대금상위</span></a>
+      <a href="/tradingvalue.html" class="sidebar-link desktop-only-link active"><span class="sidebar-icon">💰</span><span>거래대금상위</span></a>
       <a href="/settings.html" class="sidebar-link desktop-only-link"><span class="sidebar-icon">⚙️</span><span>설정</span></a>
       <div class="mobile-menu-drawer" id="mobile-menu-drawer" hidden>
         <a href="/watchlist.html" class="mobile-menu-drawer-link"><span class="sidebar-icon">⭐</span><span>관심종목</span></a>
@@ -60,60 +60,34 @@
     <div class="app-content">
       <header class="site-header">
         <div class="container">
-          <h1>주린이 기우제</h1>
-          <p class="subtitle">선행지수 심리 게이지 vs 코스피 실제 결과</p>
-          <nav class="site-nav">
-            <a href="/" class="site-nav-link">대시보드</a>
-            <a href="/stats.html" class="site-nav-link active">통계</a>
-          </nav>
+          <h1>거래대금상위</h1>
+          <p class="subtitle">오늘 거래대금 상위 종목 · 수급 · 관련 뉴스</p>
         </div>
       </header>
 
       <main class="container">
-    <section class="stats-summary-section">
-      <article class="stats-summary-card" id="stats-summary-card">
-        <p class="stats-summary-label" id="stats-summary-label">불러오는 중...</p>
-        <p class="stats-summary-detail" id="stats-summary-detail">-</p>
-      </article>
-      <p class="sentiment-disclaimer">
-        매일 개장(오전 9시) 직후 심리 게이지 판정과, 코스피 시가가 전일 종가 대비 상승했는지 하락했는지를 비교해
-        평일마다 자동으로 1건씩 기록합니다(방문 여부와 무관). 표본이 적을 때는 적중률이 크게 흔들릴 수 있습니다.
-        투자 자문이 아닙니다.
-      </p>
-    </section>
+        <p class="screener-updated" id="tradingvalue-updated">불러오는 중...</p>
 
-    <section class="stats-table-section">
-      <h2 class="section-title">일별 이력</h2>
-      <div class="stats-table-wrap">
-        <table class="stats-table" id="stats-table">
-          <thead>
-            <tr>
-              <th>날짜</th>
-              <th>판정</th>
-              <th>점수</th>
-              <th>결과</th>
-              <th>적중</th>
-            </tr>
-          </thead>
-          <tbody id="stats-table-body">
-            <tr>
-              <td colspan="5" class="stats-empty">불러오는 중...</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+        <ul class="screener-list" id="tradingvalue-list">
+          <li class="calendar-empty">불러오는 중...</li>
+        </ul>
+
+        <p class="sentiment-disclaimer">
+          코스피·코스닥 전체(ETF 제외) 중 오늘 거래대금이 가장 큰 30개 종목을 그대로 보여줍니다.
+          매수·매도 추천이 아니며, 외국인·기관 순매수와 관련 뉴스는 참고용 사실 정보입니다.
+          투자 자문이 아니며 투자 판단과 책임은 본인에게 있습니다.
+        </p>
       </main>
 
       <footer class="site-footer">
         <div class="container">
-          <p>데이터 제공: 네이버 금융 · FRED · 한국은행 ECOS · Trading Economics</p>
+          <p>데이터 제공: 네이버 금융</p>
         </div>
       </footer>
     </div>
   </div>
 
-  <script src="stats.js"></script>
+  <script src="tradingvalue.js"></script>
   <script src="sidebar-menu.js"></script>
   <script src="theme-toggle.js"></script>
 </body>
