@@ -158,9 +158,23 @@ function renderWatchlist(items) {
       price.textContent = `${item.currentPrice.toLocaleString()} ${arrow} ${item.changeRatio}%`;
     }
 
+    const gearBtn = document.createElement('button');
+    gearBtn.type = 'button';
+    gearBtn.className = 'watchlist-gear';
+    gearBtn.title = '그룹 이동 · 삭제';
+    gearBtn.setAttribute('aria-expanded', 'false');
+    gearBtn.textContent = '⚙️';
+
+    const panel = document.createElement('div');
+    panel.className = 'watchlist-manage';
+    panel.hidden = true;
+
+    const moveLabel = document.createElement('span');
+    moveLabel.className = 'watchlist-manage-label';
+    moveLabel.textContent = '그룹 이동';
+
     const moveSelect = document.createElement('select');
     moveSelect.className = 'watchlist-move';
-    moveSelect.title = '다른 그룹으로 이동';
     for (let g = 1; g <= 5; g++) {
       const option = document.createElement('option');
       option.value = String(g);
@@ -174,12 +188,24 @@ function renderWatchlist(items) {
     removeBtn.type = 'button';
     removeBtn.className = 'watchlist-remove';
     removeBtn.textContent = '삭제';
-    removeBtn.addEventListener('click', () => removeStock(item.code));
+    removeBtn.addEventListener('click', () => {
+      if (confirm(`${item.name || item.code}을(를) 관심종목에서 삭제할까요?`)) removeStock(item.code);
+    });
+
+    panel.appendChild(moveLabel);
+    panel.appendChild(moveSelect);
+    panel.appendChild(removeBtn);
+
+    gearBtn.addEventListener('click', () => {
+      const isOpen = gearBtn.getAttribute('aria-expanded') === 'true';
+      gearBtn.setAttribute('aria-expanded', String(!isOpen));
+      panel.hidden = isOpen;
+    });
 
     li.appendChild(name);
     li.appendChild(price);
-    li.appendChild(moveSelect);
-    li.appendChild(removeBtn);
+    li.appendChild(gearBtn);
+    li.appendChild(panel);
     listEl.appendChild(li);
   });
 }

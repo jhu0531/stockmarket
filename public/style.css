@@ -1480,8 +1480,46 @@ main {
   gap: 0.5rem;
 }
 
+.watchlist-gear {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 8px;
+  line-height: 1;
+}
+
+.watchlist-gear:hover,
+.watchlist-gear[aria-expanded='true'] {
+  background: var(--border);
+}
+
+.watchlist-manage {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--border);
+}
+
+.watchlist-manage[hidden] {
+  display: none;
+}
+
+.watchlist-manage-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.watchlist-manage .watchlist-remove {
+  margin-left: auto;
+}
+
 .watchlist-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   background: var(--card-bg);
