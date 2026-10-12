@@ -1480,41 +1480,104 @@ main {
   gap: 0.5rem;
 }
 
+.watchlist-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.5rem 0 0.5rem;
+}
+
 .watchlist-gear {
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 1rem;
-  padding: 0.2rem 0.3rem;
+  font-size: 1.1rem;
+  padding: 0.3rem 0.4rem;
   border-radius: 8px;
   line-height: 1;
 }
 
 .watchlist-gear:hover,
-.watchlist-gear[aria-expanded='true'] {
+.watchlist-gear[aria-pressed='true'] {
   background: var(--border);
 }
 
-.watchlist-manage {
-  flex: 1 0 100%;
+.watchlist-edit-bar {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding-top: 0.6rem;
-  border-top: 1px dashed var(--border);
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
 }
 
-.watchlist-manage[hidden] {
+.watchlist-edit-bar[hidden] {
   display: none;
 }
 
-.watchlist-manage-label {
-  font-size: 0.78rem;
-  color: var(--muted);
+.watchlist-edit-bar.busy {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
-.watchlist-manage .watchlist-remove {
-  margin-left: auto;
+.watchlist-select-all {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-right: auto;
+  font-size: 0.85rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.watchlist-edit-bar button:disabled,
+.watchlist-edit-bar select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.watchlist-check {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.watchlist-list.editing .watchlist-item {
+  cursor: pointer;
+  user-select: none;
+}
+
+.watchlist-item.selected {
+  border-color: var(--text);
+}
+
+.watchlist-reorder {
+  display: flex;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.watchlist-reorder button {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.watchlist-reorder button:hover:not(:disabled) {
+  background: var(--border);
+}
+
+.watchlist-reorder button:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .watchlist-item {

@@ -1626,8 +1626,16 @@ app.get('/api/watchlist', requireAuth, async (req, res) => {
       getScreenerFairValueMap(),
     ]);
 
+    // 사용자가 순서를 바꾼 종목은 order 순, 아직 안 바꾼(order 없는) 종목은
+    // 그 뒤에 추가한 순서대로. sort는 안정 정렬이라 addedAt 순서가 유지된다.
+    const docs = [...snapshot.docs].sort((a, b) => {
+      const oa = a.data().order;
+      const ob = b.data().order;
+      return (Number.isFinite(oa) ? oa : Infinity) - (Number.isFinite(ob) ? ob : Infinity) || 0;
+    });
+
     const items = await Promise.all(
-      snapshot.docs.map(async (doc) => {
+      docs.map(async (doc) => {
         const { code, name, group } = doc.data();
         try {
           const valuation = await fetchStockValuation(code, screenerFairValueMap.get(code));
@@ -1668,6 +1676,29 @@ app.post('/api/watchlist', requireAuth, async (req, res) => {
   }
 });
 
+// 한 그룹 안의 표시 순서를 저장한다. codes 배열의 인덱스가 곧 order 값.
+app.put('/api/watchlist/order', requireAuth, async (req, res) => {
+  const codes = req.body && req.body.codes;
+  if (!Array.isArray(codes) || !codes.every((c) => typeof c === 'string' && c)) {
+    return res.status(400).json({ error: 'codes must be an array of stock codes' });
+  }
+
+  try {
+    const collection = db.collection('users').doc(req.uid).collection('watchlist');
+    // 없는 문서에 update하면 batch 전체가 실패하므로 실제 존재하는 종목만 반영한다.
+    const existing = new Set((await collection.select().get()).docs.map((doc) => doc.id));
+    const batch = db.batch();
+    codes.forEach((code, index) => {
+      if (existing.has(code)) batch.update(collection.doc(code), { order: index });
+    });
+    await batch.commit();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Failed to reorder watchlist:', err.message);
+    res.status(502).json({ error: 'Failed to reorder watchlist' });
+  }
+});
+
 app.patch('/api/watchlist/:code', requireAuth, async (req, res) => {
   const group = Number(req.body && req.body.group);
   if (!Number.isInteger(group) || group < 1 || group > 5) {
@@ -1675,7 +1706,9 @@ app.patch('/api/watchlist/:code', requireAuth, async (req, res) => {
   }
 
   try {
-    await db.collection('users').doc(req.uid).collection('watchlist').doc(req.params.code).update({ group });
+    // 다른 그룹으로 옮긴 종목은 이전 그룹에서의 순번을 지워 새 그룹 맨 뒤에 붙게 한다.
+    await db.collection('users').doc(req.uid).collection('watchlist').doc(req.params.code)
+      .update({ group, order: FieldValue.delete() });
     res.json({ ok: true });
   } catch (err) {
     console.error('Failed to move watchlist item:', err.message);

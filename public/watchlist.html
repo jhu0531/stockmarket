@@ -84,6 +84,26 @@
             <ul class="search-results" id="search-results" hidden></ul>
           </div>
 
+          <div class="watchlist-toolbar">
+            <button type="button" id="watchlist-edit-toggle" class="watchlist-gear" title="관심종목 편집" aria-pressed="false">⚙️</button>
+          </div>
+
+          <div class="watchlist-edit-bar" id="watchlist-edit-bar" hidden>
+            <label class="watchlist-select-all">
+              <input type="checkbox" id="watchlist-select-all" />
+              <span id="watchlist-selected-count">0개 선택</span>
+            </label>
+            <select id="watchlist-bulk-move" class="watchlist-move" disabled>
+              <option value="">그룹 이동</option>
+              <option value="1">1그룹</option>
+              <option value="2">2그룹</option>
+              <option value="3">3그룹</option>
+              <option value="4">4그룹</option>
+              <option value="5">5그룹</option>
+            </select>
+            <button type="button" id="watchlist-bulk-remove" class="watchlist-remove" disabled>삭제</button>
+          </div>
+
           <ul class="watchlist-list" id="watchlist-list">
             <li class="calendar-empty">불러오는 중...</li>
           </ul>

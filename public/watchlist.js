@@ -10,10 +10,19 @@ const searchInput = document.getElementById('stock-search-input');
 const searchResultsEl = document.getElementById('search-results');
 const listEl = document.getElementById('watchlist-list');
 const groupTabsEl = document.getElementById('group-tabs');
+const editToggleBtn = document.getElementById('watchlist-edit-toggle');
+const editBarEl = document.getElementById('watchlist-edit-bar');
+const selectAllEl = document.getElementById('watchlist-select-all');
+const selectedCountEl = document.getElementById('watchlist-selected-count');
+const bulkMoveSelect = document.getElementById('watchlist-bulk-move');
+const bulkRemoveBtn = document.getElementById('watchlist-bulk-remove');
 
 const DIRECTION_CLASS = { RISING: 'up', FALLING: 'down', EVEN: 'flat' };
 
 let allItems = [];
+let visibleItems = [];
+let editMode = false;
+const selectedCodes = new Set();
 
 loginBtn.addEventListener('click', () => {
   loginWithGoogle().catch((err) => alert('로그인에 실패했습니다: ' + err.message));
@@ -100,24 +109,140 @@ async function addStock(code, name) {
   loadWatchlist();
 }
 
-async function removeStock(code) {
-  const token = await getIdToken();
-  await fetch(`/api/watchlist/${code}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  loadWatchlist();
+// ▲▼를 연달아 눌러도 요청은 마지막 순서로 한 번만 보내도록 잠시 모았다가 저장한다.
+const ORDER_SAVE_DELAY = 800;
+let orderSaveTimer = null;
+let pendingOrderCodes = null;
+
+function scheduleOrderSave(codes) {
+  pendingOrderCodes = codes;
+  clearTimeout(orderSaveTimer);
+  orderSaveTimer = setTimeout(flushOrderSave, ORDER_SAVE_DELAY);
 }
 
-async function moveStock(code, group) {
+async function flushOrderSave() {
+  clearTimeout(orderSaveTimer);
+  if (!pendingOrderCodes) return;
+  const codes = pendingOrderCodes;
+  pendingOrderCodes = null;
+  try {
+    const token = await getIdToken();
+    const res = await fetch('/api/watchlist/order', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ codes }),
+    });
+    if (!res.ok) throw new Error(String(res.status));
+  } catch (err) {
+    alert('순서를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.');
+    loadWatchlist();
+  }
+}
+
+// 페이지를 떠나기 직전에 아직 안 보낸 순서가 있으면 마저 보낸다.
+window.addEventListener('pagehide', () => {
+  if (pendingOrderCodes) flushOrderSave();
+});
+
+function moveItem(index, delta) {
+  const target = index + delta;
+  if (target < 0 || target >= visibleItems.length) return;
+  const reordered = [...visibleItems];
+  [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+  visibleItems = reordered;
+  // 그룹 탭을 오가도 바뀐 순서가 유지되도록 allItems에도 반영한다.
+  const inGroup = new Set(visibleItems.map((item) => item.code));
+  allItems = allItems.filter((item) => !inGroup.has(item.code)).concat(visibleItems);
+  scheduleOrderSave(visibleItems.map((item) => item.code));
+  renderWatchlist(visibleItems);
+  // 다시 그려진 뒤에도 같은 종목의 같은 버튼에 포커스를 둬서 연속으로 누를 수 있게.
+  const movedRow = listEl.children[target];
+  const btn = movedRow && movedRow.querySelector(delta < 0 ? '.watchlist-up' : '.watchlist-down');
+  if (btn && !btn.disabled) btn.focus();
+}
+
+// 선택된 종목들에 같은 요청을 병렬로 보내고, 끝나면 목록을 한 번만 다시 불러온다.
+async function applyToCodes(codes, buildRequest) {
+  await flushOrderSave();
   const token = await getIdToken();
-  await fetch(`/api/watchlist/${code}`, {
+  const results = await Promise.allSettled(
+    codes.map((code) =>
+      fetch(`/api/watchlist/${code}`, buildRequest(token)).then((res) => {
+        if (!res.ok) throw new Error(String(res.status));
+      })
+    )
+  );
+  const failed = results.filter((r) => r.status === 'rejected').length;
+  if (failed) alert(`${codes.length}개 중 ${failed}개 종목 처리에 실패했습니다.`);
+  await loadWatchlist();
+}
+
+function removeStocks(codes) {
+  return applyToCodes(codes, (token) => ({
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  }));
+}
+
+function moveStocks(codes, group) {
+  return applyToCodes(codes, (token) => ({
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ group }),
-  });
-  loadWatchlist();
+  }));
 }
+
+function setEditMode(on) {
+  if (!on) flushOrderSave();
+  editMode = on;
+  selectedCodes.clear();
+  editToggleBtn.setAttribute('aria-pressed', String(on));
+  editToggleBtn.title = on ? '편집 완료' : '관심종목 편집';
+  editBarEl.hidden = !on;
+  renderWatchlist(visibleItems);
+}
+
+function updateEditBar() {
+  const count = selectedCodes.size;
+  selectedCountEl.textContent = `${count}개 선택`;
+  selectAllEl.checked = visibleItems.length > 0 && count === visibleItems.length;
+  selectAllEl.indeterminate = count > 0 && count < visibleItems.length;
+  selectAllEl.disabled = visibleItems.length === 0;
+  bulkMoveSelect.disabled = count === 0;
+  bulkRemoveBtn.disabled = count === 0;
+}
+
+// 일괄 작업 중에는 편집 바를 잠가 중복 요청을 막는다.
+async function runBulk(task) {
+  editBarEl.classList.add('busy');
+  try {
+    await task();
+  } finally {
+    editBarEl.classList.remove('busy');
+  }
+}
+
+editToggleBtn.addEventListener('click', () => setEditMode(!editMode));
+
+selectAllEl.addEventListener('change', () => {
+  selectedCodes.clear();
+  if (selectAllEl.checked) visibleItems.forEach((item) => selectedCodes.add(item.code));
+  renderWatchlist(visibleItems);
+});
+
+bulkMoveSelect.addEventListener('change', () => {
+  const group = Number(bulkMoveSelect.value);
+  bulkMoveSelect.value = '';
+  if (!group || !selectedCodes.size) return;
+  runBulk(() => moveStocks([...selectedCodes], group));
+});
+
+bulkRemoveBtn.addEventListener('click', () => {
+  if (!selectedCodes.size) return;
+  const codes = [...selectedCodes];
+  if (!confirm(`선택한 ${codes.length}개 종목을 관심종목에서 삭제할까요?`)) return;
+  runBulk(() => removeStocks(codes));
+});
 
 async function loadWatchlist() {
   const token = await getIdToken();
@@ -127,7 +252,9 @@ async function loadWatchlist() {
     const data = await res.json();
     allItems = data.items || [];
     renderGroupTabs(groupTabsEl, (group) => {
-      renderWatchlist(allItems.filter((item) => (item.group || 1) === group));
+      selectedCodes.clear();
+      visibleItems = allItems.filter((item) => (item.group || 1) === group);
+      renderWatchlist(visibleItems);
     });
   } catch (err) {
     listEl.innerHTML = '<li class="calendar-empty">관심종목을 불러오지 못했습니다.</li>';
@@ -136,14 +263,40 @@ async function loadWatchlist() {
 
 function renderWatchlist(items) {
   listEl.innerHTML = '';
+  listEl.classList.toggle('editing', editMode);
+  if (editMode) updateEditBar();
   if (!items.length) {
     listEl.innerHTML = '<li class="calendar-empty">이 그룹에 추가된 종목이 없습니다. 위에서 검색해 추가해보세요.</li>';
     return;
   }
 
-  items.forEach((item) => {
+  items.forEach((item, index) => {
     const li = document.createElement('li');
     li.className = `watchlist-item ${DIRECTION_CLASS[item.direction] || 'flat'}`;
+
+    if (editMode) {
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'watchlist-check';
+      checkbox.checked = selectedCodes.has(item.code);
+      checkbox.setAttribute('aria-label', `${item.name || item.code} 선택`);
+      li.classList.toggle('selected', checkbox.checked);
+
+      const sync = () => {
+        if (checkbox.checked) selectedCodes.add(item.code);
+        else selectedCodes.delete(item.code);
+        li.classList.toggle('selected', checkbox.checked);
+        updateEditBar();
+      };
+      checkbox.addEventListener('change', sync);
+      // 편집 중에는 행 아무 곳이나 눌러도 선택이 토글되도록.
+      li.addEventListener('click', (e) => {
+        if (e.target === checkbox) return;
+        checkbox.checked = !checkbox.checked;
+        sync();
+      });
+      li.appendChild(checkbox);
+    }
 
     const name = document.createElement('span');
     name.className = 'watchlist-name';
@@ -158,54 +311,28 @@ function renderWatchlist(items) {
       price.textContent = `${item.currentPrice.toLocaleString()} ${arrow} ${item.changeRatio}%`;
     }
 
-    const gearBtn = document.createElement('button');
-    gearBtn.type = 'button';
-    gearBtn.className = 'watchlist-gear';
-    gearBtn.title = '그룹 이동 · 삭제';
-    gearBtn.setAttribute('aria-expanded', 'false');
-    gearBtn.textContent = '⚙️';
-
-    const panel = document.createElement('div');
-    panel.className = 'watchlist-manage';
-    panel.hidden = true;
-
-    const moveLabel = document.createElement('span');
-    moveLabel.className = 'watchlist-manage-label';
-    moveLabel.textContent = '그룹 이동';
-
-    const moveSelect = document.createElement('select');
-    moveSelect.className = 'watchlist-move';
-    for (let g = 1; g <= 5; g++) {
-      const option = document.createElement('option');
-      option.value = String(g);
-      option.textContent = `${g}그룹`;
-      if ((item.group || 1) === g) option.selected = true;
-      moveSelect.appendChild(option);
-    }
-    moveSelect.addEventListener('change', () => moveStock(item.code, Number(moveSelect.value)));
-
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'watchlist-remove';
-    removeBtn.textContent = '삭제';
-    removeBtn.addEventListener('click', () => {
-      if (confirm(`${item.name || item.code}을(를) 관심종목에서 삭제할까요?`)) removeStock(item.code);
-    });
-
-    panel.appendChild(moveLabel);
-    panel.appendChild(moveSelect);
-    panel.appendChild(removeBtn);
-
-    gearBtn.addEventListener('click', () => {
-      const isOpen = gearBtn.getAttribute('aria-expanded') === 'true';
-      gearBtn.setAttribute('aria-expanded', String(!isOpen));
-      panel.hidden = isOpen;
-    });
-
     li.appendChild(name);
     li.appendChild(price);
-    li.appendChild(gearBtn);
-    li.appendChild(panel);
+
+    if (editMode) {
+      const reorder = document.createElement('span');
+      reorder.className = 'watchlist-reorder';
+      [['watchlist-up', '▲', '위로', -1], ['watchlist-down', '▼', '아래로', 1]].forEach(([cls, label, verb, delta]) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = cls;
+        btn.textContent = label;
+        btn.setAttribute('aria-label', `${item.name || item.code} ${verb} 이동`);
+        btn.disabled = delta < 0 ? index === 0 : index === items.length - 1;
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation(); // 행 클릭(선택 토글)으로 번지지 않게
+          moveItem(index, delta);
+        });
+        reorder.appendChild(btn);
+      });
+      li.appendChild(reorder);
+    }
+
     listEl.appendChild(li);
   });
 }
