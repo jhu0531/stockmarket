@@ -190,16 +190,55 @@ async function fetchNaverIndices({ market, symbols, type = 'index' }) {
 
   const data = await upstream.json();
 
-  return data.datas.map((item) => ({
-    code: item.itemCode || item.reutersCode,
-    name: item.stockName || item.indexName,
-    price: item.closePrice,
-    change: item.compareToPreviousClosePrice,
-    changeRatio: item.fluctuationsRatio,
-    direction: item.compareToPreviousPrice.name, // RISING, FALLING, EVEN
-    marketStatus: item.marketStatus,
-    tradedAt: item.localTradedAt,
-  }));
+  return Promise.all(
+    data.datas.map(async (item) => {
+      let { compareToPreviousClosePrice: change, fluctuationsRatio: changeRatio } = item;
+      let direction = item.compareToPreviousPrice.name; // RISING, FALLING, EVEN
+
+      // Before the US open (PREOPEN) Naver reports a brand-new session with a
+      // 0.00 change, which would read as "flat" for hours. Show the last
+      // completed session's move instead — but only if its close matches the
+      // quoted close, so we never substitute a stale or mismatched row.
+      if (type === 'stock' && item.marketStatus === 'PREOPEN') {
+        const last = await fetchLastSessionMove(item.reutersCode || item.itemCode, item.closePrice);
+        if (last) ({ change, changeRatio, direction } = last);
+      }
+
+      return {
+        code: item.itemCode || item.reutersCode,
+        name: item.stockName || item.indexName,
+        price: item.closePrice,
+        change,
+        changeRatio,
+        direction,
+        marketStatus: item.marketStatus,
+        tradedAt: item.localTradedAt,
+      };
+    })
+  );
+}
+
+// Last completed session's move for a US stock, from Naver's daily price list
+// (newest first). Returns null on any mismatch/failure so callers keep the live
+// values.
+async function fetchLastSessionMove(reutersCode, expectedClose) {
+  try {
+    const upstream = await fetchWithRetry(
+      `https://api.stock.naver.com/stock/${encodeURIComponent(reutersCode)}/price?page=1&pageSize=1`,
+      { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' } }
+    );
+    const [row] = await upstream.json();
+    if (!row || row.closePrice !== expectedClose) return null;
+
+    return {
+      change: row.compareToPreviousClosePrice,
+      changeRatio: row.fluctuationsRatio,
+      direction: row.compareToPreviousPrice.name,
+    };
+  } catch (err) {
+    console.error(`Failed to fetch last-session move for ${reutersCode}:`, err.message);
+    return null;
+  }
 }
 
 // Proxy for Naver Finance polling API (no CORS headers, so browser can't call it directly)
