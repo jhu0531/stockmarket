@@ -240,11 +240,11 @@ const LEADING_INDICATOR_SOURCES = {
   fundFlow: fetchFundFlow,
   commodities: fetchCommodities,
   krNewsSentiment: async () => {
-    const news = await scrapeNaverNews(401, KR_KEYWORDS, 3);
+    const news = await fetchNaverNews(401, KR_KEYWORDS, 3);
     return scoreKoreanSentiment(news.map((item) => `${item.title} ${item.summary}`));
   },
   nyNewsSentiment: async () => {
-    const news = await scrapeNaverNews(403, NY_KEYWORDS, 3);
+    const news = await fetchNaverNews(403, NY_KEYWORDS, 3);
     return scoreKoreanSentiment(news.map((item) => `${item.title} ${item.summary}`));
   },
 };
@@ -998,50 +998,61 @@ async function fetchFundFlow() {
   return { date, deposits, marginBalance };
 }
 
-// Scrapes a Naver Finance news list page (mode=LSS3D) and optionally filters
-// by keyword. Shared by the NY-market and domestic-market news endpoints.
-async function scrapeNaverNews(sectionId3, keywords, limit) {
-  const upstream = await fetchWithRetry(
-    `https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=${sectionId3}`,
-    { headers: { 'User-Agent': 'Mozilla/5.0' } }
-  );
+// Naver Finance news boards by section id: 401 시황·전망, 402 기업·종목분석,
+// 403 해외증시. The old finance.naver.com/news/news_list.naver page was
+// migrated away, so this reads the JSON the new stock.naver.com news page
+// calls. That API returns one calendar day per request (date=YYYYMMDD) and an
+// empty list for a day with no articles, so walk back day by day until `limit`
+// articles pass the optional keyword filter (covers early mornings, weekends,
+// and holidays). Shared by the NY-market and domestic-market news endpoints
+// and the news sentiment signals.
+const NEWS_LOOKBACK_DAYS = 7;
 
-  const buffer = Buffer.from(await upstream.arrayBuffer());
-  const html = iconv.decode(buffer, 'euc-kr');
-  const $ = cheerio.load(html);
+async function fetchNaverNews(sectionId, keywords, limit) {
+  const results = [];
+  const [y, m, d] = todayKstDateString().split('-').map(Number);
+  // A keyword filter discards most rows, so pull a bigger page to filter from.
+  const pageSize = keywords ? 30 : limit;
 
-  const items = [];
-  $('.realtimeNewsList .articleSubject').each((_, el) => {
-    const link = $(el).find('a').first();
-    const title = link.attr('title') || link.text().trim();
-    const href = link.attr('href');
-    const summaryEl = $(el).next('.articleSummary');
-    const summary = summaryEl.clone().children('span').remove().end().text().trim();
-    const press = summaryEl.find('.press').text().trim();
-    const time = summaryEl.find('.wdate').text().trim();
+  for (let back = 0; back < NEWS_LOOKBACK_DAYS && results.length < limit; back += 1) {
+    const day = new Date(Date.UTC(y, m - 1, d - back));
+    const ymd = `${day.getUTCFullYear()}${String(day.getUTCMonth() + 1).padStart(2, '0')}${String(day.getUTCDate()).padStart(2, '0')}`;
 
-    if (!title || !href) return;
+    const upstream = await fetchWithRetry(
+      `https://stock.naver.com/api/domestic/news/focus?sid=${sectionId}&page=1&pageSize=${pageSize}&date=${ymd}`,
+      { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://stock.naver.com/' } }
+    );
+    const { articles } = await upstream.json();
 
-    items.push({
-      title,
-      summary,
-      press,
-      time,
-      link: `https://finance.naver.com${href}`,
-    });
-  });
+    for (const article of articles || []) {
+      if (results.length >= limit) break;
 
-  const filtered = keywords
-    ? items.filter((item) => keywords.some((kw) => item.title.includes(kw) || item.summary.includes(kw)))
-    : items;
+      const title = (article.title || '').trim();
+      const summary = (article.subcontent || '').trim();
+      if (!title || !article.officeID || !article.articleID) continue;
+      if (keywords && !keywords.some((kw) => title.includes(kw) || summary.includes(kw))) continue;
 
-  return filtered.slice(0, limit);
+      // "20261012164509" -> "2026-10-12 16:45"
+      const t = String(article.date || '');
+      const time = t.length >= 12 ? `${t.slice(0, 4)}-${t.slice(4, 6)}-${t.slice(6, 8)} ${t.slice(8, 10)}:${t.slice(10, 12)}` : '';
+
+      results.push({
+        title,
+        summary,
+        press: article.officeHName || '',
+        time,
+        link: `https://n.news.naver.com/mnews/article/${article.officeID}/${article.articleID}`,
+      });
+    }
+  }
+
+  return results;
 }
 
 // "해외증시" news list, filtered for NY-market wrap-ups
 app.get('/api/ny-news', async (req, res) => {
   try {
-    const news = await scrapeNaverNews(403, NY_KEYWORDS, 3);
+    const news = await fetchNaverNews(403, NY_KEYWORDS, 3);
     res.json({ news, updatedAt: new Date().toISOString() });
   } catch (err) {
     console.error('Failed to fetch NY market news:', err.message);
@@ -1054,8 +1065,8 @@ app.get('/api/ny-news', async (req, res) => {
 app.get('/api/kr-news', async (req, res) => {
   try {
     const [macro, micro] = await Promise.all([
-      scrapeNaverNews(401, null, 3),
-      scrapeNaverNews(402, null, 3),
+      fetchNaverNews(401, null, 3),
+      fetchNaverNews(402, null, 3),
     ]);
     res.json({ macro, micro, updatedAt: new Date().toISOString() });
   } catch (err) {
