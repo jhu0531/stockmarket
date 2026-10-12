@@ -889,35 +889,29 @@ function readDigitSpans($el) {
     .replace(/\s+/g, '');
 }
 
+// finance.naver.com/marketindex/exchangeDetail.naver is gone (302s to the new
+// client-rendered UI), so read the JSON API that new UI calls instead.
 async function fetchUsdKrw() {
-  const upstream = await fetchWithRetry(
-    'https://finance.naver.com/marketindex/exchangeDetail.naver?marketindexCd=FX_USDKRW',
-    { headers: { 'User-Agent': 'Mozilla/5.0' } }
-  );
+  const upstream = await fetchWithRetry('https://api.stock.naver.com/marketindex/exchange/FX_USDKRW', {
+    headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
+  });
+  const { exchangeInfo: info } = await upstream.json();
+  if (!info || !info.closePrice) return null;
 
-  const buffer = Buffer.from(await upstream.arrayBuffer());
-  const html = iconv.decode(buffer, 'euc-kr');
-  const $ = cheerio.load(html);
-
-  const priceEl = $('.no_today').children('em').first();
-  const price = readDigitSpans(priceEl);
-  const direction = priceEl.hasClass('no_up') ? 'RISING' : priceEl.hasClass('no_down') ? 'FALLING' : 'EVEN';
-
-  const changeEms = $('.no_exday').children('em');
-  const rawChange = readDigitSpans(changeEms.eq(0));
-  const changeRatioText = readDigitSpans(changeEms.eq(1)); // e.g. "(+0.26%)"
-  const ratioMatch = changeRatioText.match(/\(([+-]?)([\d.]+)%\)/);
-
-  if (!price) return null;
+  // "2026-10-12T16:30:23+09:00" -> "2026.10.12 16:30 하나은행 고시회차"
+  const traded = (info.localTradedAt || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/);
+  const tradedAt = traded
+    ? `${traded[1]}.${traded[2]}.${traded[3]} ${traded[4]} ${info.description || ''}`.trim()
+    : '';
 
   return {
     code: 'USDKRW',
     name: '원/달러',
-    price,
-    change: direction === 'FALLING' ? `-${rawChange}` : rawChange,
-    changeRatio: ratioMatch ? (ratioMatch[1] === '-' ? `-${ratioMatch[2]}` : ratioMatch[2]) : '0',
-    direction,
-    tradedAt: $('.exchange_info .date').first().text().trim(),
+    price: info.closePrice,
+    change: String(info.fluctuations).replace(/^\+/, ''),
+    changeRatio: String(info.fluctuationsRatio).replace(/^\+/, ''),
+    direction: info.fluctuationsType ? info.fluctuationsType.name : 'EVEN',
+    tradedAt,
   };
 }
 
