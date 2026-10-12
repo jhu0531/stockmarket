@@ -234,8 +234,8 @@ const LEADING_INDICATOR_SOURCES = {
   bsi: () => fetchEcosSeries('512Y014', ['99988', 'BA']),
   ccsi: () => fetchEcosSeries('511Y002', ['FME']),
   creditSpread: fetchCreditSpread,
-  kospiFlow: () => fetchInvestorNetBuying(''),
-  kosdaqFlow: () => fetchInvestorNetBuying('02'),
+  kospiFlow: () => fetchInvestorNetBuying('KOSPI'),
+  kosdaqFlow: () => fetchInvestorNetBuying('KOSDAQ'),
   bdi: fetchBalticDryIndex,
   fundFlow: fetchFundFlow,
   commodities: fetchCommodities,
@@ -769,81 +769,77 @@ async function fetchEcosSeries(statCode, itemCodes) {
   };
 }
 
-// Naver's interestDetail page uses the same per-digit <span> markup as the FX
-// page; fetches 국고채(3년)/회사채(3년) and returns the credit spread.
-async function fetchNaverRate(marketindexCd) {
+// Daily closes (newest first) for a Naver marketindex instrument. The old
+// finance.naver.com/marketindex/interestDetail page was migrated away; this is
+// the JSON the new UI reads. category is 'bond' or 'domesticInterest'.
+async function fetchNaverIndexDaily(category, reutersCode) {
   const upstream = await fetchWithRetry(
-    `https://finance.naver.com/marketindex/interestDetail.naver?marketindexCd=${marketindexCd}`,
-    { headers: { 'User-Agent': 'Mozilla/5.0' } }
+    `https://m.stock.naver.com/front-api/marketIndex/prices?category=${category}&reutersCode=${encodeURIComponent(reutersCode)}&page=1`,
+    { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' } }
   );
+  const { result } = await upstream.json();
 
-  const buffer = Buffer.from(await upstream.arrayBuffer());
-  const html = iconv.decode(buffer, 'euc-kr');
-  const $ = cheerio.load(html);
-
-  const priceEl = $('.no_today').children('em').first();
-  const value = Number(readDigitSpans(priceEl));
-  if (Number.isNaN(value)) return null;
-
-  const direction = priceEl.hasClass('no_up') ? 'RISING' : priceEl.hasClass('no_down') ? 'FALLING' : 'EVEN';
-  const changeEms = $('.no_exday').children('em');
-  const rawChange = Number(readDigitSpans(changeEms.eq(0)));
-
-  return {
-    value,
-    change: direction === 'FALLING' ? -rawChange : rawChange,
-    direction,
-    date: $('.exchange_info .date').first().text().trim(),
-  };
+  return (Array.isArray(result) ? result : [])
+    .map((row) => {
+      const value = Number(String(row.closePrice).replace(/,/g, ''));
+      const magnitude = Math.abs(Number(String(row.fluctuations).replace(/,/g, '')));
+      const falling = row.fluctuationsType && row.fluctuationsType.name === 'FALLING';
+      return {
+        date: String(row.localTradedAt || '').slice(0, 10),
+        value,
+        change: falling ? -magnitude : magnitude,
+      };
+    })
+    .filter((row) => row.date && Number.isFinite(row.value) && Number.isFinite(row.change));
 }
 
+// 회사채(3년, AA-) minus 국고채(3년). The two series publish at different
+// times of day, so pair them on the corporate bond's latest date rather than
+// each series' own latest row.
 async function fetchCreditSpread() {
-  const [govt, corp] = await Promise.all([fetchNaverRate('IRR_GOVT03Y'), fetchNaverRate('IRR_CORP03Y')]);
-  if (!govt || !corp) return null;
+  const [corpRows, govtRows] = await Promise.all([
+    fetchNaverIndexDaily('domesticInterest', 'KFIA103009'),
+    fetchNaverIndexDaily('bond', 'KR3YT=RR'),
+  ]);
 
-  const value = corp.value - govt.value;
-  const change = corp.change - govt.change;
+  const corp = corpRows[0];
+  const govt = corp && govtRows.find((row) => row.date === corp.date);
+  if (!corp || !govt) return null;
+
+  const change = Number((corp.change - govt.change).toFixed(4));
 
   return {
-    value,
+    value: corp.value - govt.value,
     change,
     direction: directionOf(change),
     govt3y: govt.value,
     corp3y: corp.value,
-    date: govt.date,
+    date: corp.date.replace(/-/g, '.'),
   };
 }
 
-// Naver's "일자별 순매수" (daily net buying) widget for the whole KOSPI/KOSDAQ
-// market. sosok='' is KOSPI, sosok='02' is KOSDAQ. bizdate must be a real date
-// (today's KST date works; the page just returns the most recent trading days).
-async function fetchInvestorNetBuying(sosok) {
-  const bizdate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date()).replace(/-/g, '');
-  const upstream = await fetchWithRetry(
-    `https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate=${bizdate}&sosok=${sosok}`,
-    { headers: { 'User-Agent': 'Mozilla/5.0' } }
-  );
+// 투자자별 일자별 순매수(억원) for the whole KOSPI/KOSDAQ market. The old
+// finance.naver.com/sise/investorDealTrendDay page was migrated away, so read
+// dealTrendInfo from the index "integration" JSON the new UI uses.
+// indexCode is 'KOSPI' or 'KOSDAQ'.
+async function fetchInvestorNetBuying(indexCode) {
+  const upstream = await fetchWithRetry(`https://m.stock.naver.com/api/index/${indexCode}/integration`, {
+    headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
+  });
+  const { dealTrendInfo: deal } = await upstream.json();
+  if (!deal) return null;
 
-  const buffer = Buffer.from(await upstream.arrayBuffer());
-  const html = iconv.decode(buffer, 'euc-kr');
-  const $ = cheerio.load(html);
-
-  const row = $('td.date2').first().closest('tr');
-  if (!row.length) return null;
-
-  const cells = row.find('td');
-  // Column order: 날짜, 개인, 외국인, 기관계, ...기관 세부..., 기타법인
-  const parseCell = (i) => {
-    const text = cells.eq(i).text().trim().replace(/,/g, '');
-    return Number(text);
-  };
-
-  const foreign = parseCell(2);
-  const institution = parseCell(3);
+  const parse = (v) => Number(String(v).replace(/[,+]/g, ''));
+  const foreign = parse(deal.foreignValue);
+  const institution = parse(deal.institutionalValue);
   if (Number.isNaN(foreign) || Number.isNaN(institution)) return null;
 
+  // "20261012" -> "26.10.12" (same style the old page showed)
+  const b = String(deal.bizdate || '');
+  const date = b.length === 8 ? `${b.slice(2, 4)}.${b.slice(4, 6)}.${b.slice(6, 8)}` : b;
+
   return {
-    date: cells.eq(0).text().trim(),
+    date,
     foreign: { value: foreign, direction: directionOf(foreign) },
     institution: { value: institution, direction: directionOf(institution) },
   };
@@ -879,14 +875,6 @@ async function fetchBalticDryIndex() {
     direction: directionOf(changeValue),
     date: row.find('#date').first().text().trim(),
   };
-}
-
-// Naver's exchangeDetail page renders the price/change as one <span> per digit;
-// concatenating the element's text (and stripping whitespace) reassembles it.
-function readDigitSpans($el) {
-  return $el
-    .text()
-    .replace(/\s+/g, '');
 }
 
 // finance.naver.com/marketindex/exchangeDetail.naver is gone (302s to the new
@@ -980,43 +968,34 @@ async function fetchCommodities() {
   });
 }
 
-// Scrapes Naver's "증시자금동향" table for the latest 고객예탁금 (investor
-// deposits) and 신용잔고 (margin loan balance), both in 억원 (100M KRW).
+// Latest 고객예탁금 (investor deposits) and 신용잔고 (margin loan balance), both
+// in 억원 (100M KRW), from Naver's 증시자금동향. The old finance.naver.com
+// sise_deposit page was migrated away; this is the JSON the new page calls
+// (newest row first).
 async function fetchFundFlow() {
-  const upstream = await fetchWithRetry('https://finance.naver.com/sise/sise_deposit.naver', {
-    headers: { 'User-Agent': 'Mozilla/5.0' },
+  const upstream = await fetchWithRetry('https://stock.naver.com/api/domestic/market/trendDeposit', {
+    headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://stock.naver.com/' },
   });
+  const { content } = await upstream.json();
+  const row = Array.isArray(content) && content[0];
+  if (!row) return null;
 
-  const buffer = Buffer.from(await upstream.arrayBuffer());
-  const html = iconv.decode(buffer, 'euc-kr');
-  const $ = cheerio.load(html);
-
-  const row = $('table.type_1 tr')
-    .filter((_, el) => $(el).find('td.date').length > 0)
-    .first();
-
-  if (!row.length) return null;
-
-  const cells = row.find('td');
-  const cellAt = (i) => {
-    const el = cells.eq(i);
-    const value = el.text().trim();
-    const direction = el.hasClass('rate_up') ? 'RISING' : el.hasClass('rate_down') ? 'FALLING' : 'EVEN';
-    return { value, direction };
+  const metric = (valueKey, diffKey) => {
+    const value = Number(row[valueKey]);
+    const diff = Number(row[diffKey]);
+    if (!Number.isFinite(value) || !Number.isFinite(diff)) return null;
+    return { value: value.toLocaleString('en-US'), change: diff.toLocaleString('en-US'), direction: directionOf(diff) };
   };
 
-  const depositValue = cellAt(1);
-  const depositChange = cellAt(2);
-  const marginValue = cellAt(3);
-  const marginChange = cellAt(4);
+  const deposits = metric('customerDeposit', 'customerDepositDiff');
+  const marginBalance = metric('creditLoan', 'creditLoanDiff');
+  if (!deposits || !marginBalance) return null;
 
-  const signed = (cell) => (cell.direction === 'FALLING' ? `-${cell.value}` : cell.value);
+  // "20261007" -> "26.10.07" (same style the old page showed)
+  const b = String(row.bizdate || '');
+  const date = b.length === 8 ? `${b.slice(2, 4)}.${b.slice(4, 6)}.${b.slice(6, 8)}` : b;
 
-  return {
-    date: cells.eq(0).text().trim(),
-    deposits: { value: depositValue.value, change: signed(depositChange), direction: depositValue.direction },
-    marginBalance: { value: marginValue.value, change: signed(marginChange), direction: marginValue.direction },
-  };
+  return { date, deposits, marginBalance };
 }
 
 // Scrapes a Naver Finance news list page (mode=LSS3D) and optionally filters
